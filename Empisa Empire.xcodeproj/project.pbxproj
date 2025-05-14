@@ -1,0 +1,559 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXContainerItemProxy section */
+		3BE4E6C32DC15DD000232994 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 3BE4E6AD2DC15DCA00232994 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3BE4E6B42DC15DCA00232994;
+			remoteInfo = "Habit Builder";
+		};
+		3BE4E6CD2DC15DD000232994 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 3BE4E6AD2DC15DCA00232994 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3BE4E6B42DC15DCA00232994;
+			remoteInfo = "Habit Builder";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		3BE4E6B52DC15DCA00232994 /* Empisa Empire.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Empisa Empire.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		3BE4E6C22DC15DD000232994 /* Empisa EmpireTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Empisa EmpireTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		3BE4E6CC2DC15DD000232994 /* Empisa EmpireUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Empisa EmpireUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		3BE4E6B72DC15DCA00232994 /* Habit Builder */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Habit Builder";
+			sourceTree = "<group>";
+		};
+		3BE4E6C52DC15DD000232994 /* Habit BuilderTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Habit BuilderTests";
+			sourceTree = "<group>";
+		};
+		3BE4E6CF2DC15DD000232994 /* Habit BuilderUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Habit BuilderUITests";
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		3BE4E6B22DC15DCA00232994 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3BE4E6BF2DC15DD000232994 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3BE4E6C92DC15DD000232994 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		3BE4E6AC2DC15DCA00232994 = {
+			isa = PBXGroup;
+			children = (
+				3BE4E6B72DC15DCA00232994 /* Habit Builder */,
+				3BE4E6C52DC15DD000232994 /* Habit BuilderTests */,
+				3BE4E6CF2DC15DD000232994 /* Habit BuilderUITests */,
+				3BE4E6B62DC15DCA00232994 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		3BE4E6B62DC15DCA00232994 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				3BE4E6B52DC15DCA00232994 /* Empisa Empire.app */,
+				3BE4E6C22DC15DD000232994 /* Empisa EmpireTests.xctest */,
+				3BE4E6CC2DC15DD000232994 /* Empisa EmpireUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		3BE4E6B42DC15DCA00232994 /* Empisa Empire */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3BE4E6D62DC15DD000232994 /* Build configuration list for PBXNativeTarget "Empisa Empire" */;
+			buildPhases = (
+				3BE4E6B12DC15DCA00232994 /* Sources */,
+				3BE4E6B22DC15DCA00232994 /* Frameworks */,
+				3BE4E6B32DC15DCA00232994 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				3BE4E6B72DC15DCA00232994 /* Habit Builder */,
+			);
+			name = "Empisa Empire";
+			packageProductDependencies = (
+			);
+			productName = "Habit Builder";
+			productReference = 3BE4E6B52DC15DCA00232994 /* Empisa Empire.app */;
+			productType = "com.apple.product-type.application";
+		};
+		3BE4E6C12DC15DD000232994 /* Empisa EmpireTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3BE4E6D92DC15DD000232994 /* Build configuration list for PBXNativeTarget "Empisa EmpireTests" */;
+			buildPhases = (
+				3BE4E6BE2DC15DD000232994 /* Sources */,
+				3BE4E6BF2DC15DD000232994 /* Frameworks */,
+				3BE4E6C02DC15DD000232994 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				3BE4E6C42DC15DD000232994 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				3BE4E6C52DC15DD000232994 /* Habit BuilderTests */,
+			);
+			name = "Empisa EmpireTests";
+			packageProductDependencies = (
+			);
+			productName = "Habit BuilderTests";
+			productReference = 3BE4E6C22DC15DD000232994 /* Empisa EmpireTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		3BE4E6CB2DC15DD000232994 /* Empisa EmpireUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3BE4E6DC2DC15DD000232994 /* Build configuration list for PBXNativeTarget "Empisa EmpireUITests" */;
+			buildPhases = (
+				3BE4E6C82DC15DD000232994 /* Sources */,
+				3BE4E6C92DC15DD000232994 /* Frameworks */,
+				3BE4E6CA2DC15DD000232994 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				3BE4E6CE2DC15DD000232994 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				3BE4E6CF2DC15DD000232994 /* Habit BuilderUITests */,
+			);
+			name = "Empisa EmpireUITests";
+			packageProductDependencies = (
+			);
+			productName = "Habit BuilderUITests";
+			productReference = 3BE4E6CC2DC15DD000232994 /* Empisa EmpireUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		3BE4E6AD2DC15DCA00232994 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1630;
+				LastUpgradeCheck = 1630;
+				TargetAttributes = {
+					3BE4E6B42DC15DCA00232994 = {
+						CreatedOnToolsVersion = 16.3;
+					};
+					3BE4E6C12DC15DD000232994 = {
+						CreatedOnToolsVersion = 16.3;
+						TestTargetID = 3BE4E6B42DC15DCA00232994;
+					};
+					3BE4E6CB2DC15DD000232994 = {
+						CreatedOnToolsVersion = 16.3;
+						TestTargetID = 3BE4E6B42DC15DCA00232994;
+					};
+				};
+			};
+			buildConfigurationList = 3BE4E6B02DC15DCA00232994 /* Build configuration list for PBXProject "Empisa Empire" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 3BE4E6AC2DC15DCA00232994;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 3BE4E6B62DC15DCA00232994 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				3BE4E6B42DC15DCA00232994 /* Empisa Empire */,
+				3BE4E6C12DC15DD000232994 /* Empisa EmpireTests */,
+				3BE4E6CB2DC15DD000232994 /* Empisa EmpireUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		3BE4E6B32DC15DCA00232994 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3BE4E6C02DC15DD000232994 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3BE4E6CA2DC15DD000232994 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		3BE4E6B12DC15DCA00232994 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3BE4E6BE2DC15DD000232994 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3BE4E6C82DC15DD000232994 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		3BE4E6C42DC15DD000232994 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3BE4E6B42DC15DCA00232994 /* Empisa Empire */;
+			targetProxy = 3BE4E6C32DC15DD000232994 /* PBXContainerItemProxy */;
+		};
+		3BE4E6CE2DC15DD000232994 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3BE4E6B42DC15DCA00232994 /* Empisa Empire */;
+			targetProxy = 3BE4E6CD2DC15DD000232994 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		3BE4E6D42DC15DD000232994 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.4;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		3BE4E6D52DC15DD000232994 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.4;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		3BE4E6D72DC15DD000232994 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5W4B9A65LA;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.marcos.Habit-Builder";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		3BE4E6D82DC15DD000232994 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5W4B9A65LA;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.marcos.Habit-Builder";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		3BE4E6DA2DC15DD000232994 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.marcos.Habit-BuilderTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Empisa Empire.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Empisa Empire";
+			};
+			name = Debug;
+		};
+		3BE4E6DB2DC15DD000232994 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.marcos.Habit-BuilderTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Empisa Empire.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Empisa Empire";
+			};
+			name = Release;
+		};
+		3BE4E6DD2DC15DD000232994 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.marcos.Habit-BuilderUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = "Habit Builder";
+			};
+			name = Debug;
+		};
+		3BE4E6DE2DC15DD000232994 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.marcos.Habit-BuilderUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = "Habit Builder";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		3BE4E6B02DC15DCA00232994 /* Build configuration list for PBXProject "Empisa Empire" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3BE4E6D42DC15DD000232994 /* Debug */,
+				3BE4E6D52DC15DD000232994 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		3BE4E6D62DC15DD000232994 /* Build configuration list for PBXNativeTarget "Empisa Empire" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3BE4E6D72DC15DD000232994 /* Debug */,
+				3BE4E6D82DC15DD000232994 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		3BE4E6D92DC15DD000232994 /* Build configuration list for PBXNativeTarget "Empisa EmpireTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3BE4E6DA2DC15DD000232994 /* Debug */,
+				3BE4E6DB2DC15DD000232994 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		3BE4E6DC2DC15DD000232994 /* Build configuration list for PBXNativeTarget "Empisa EmpireUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3BE4E6DD2DC15DD000232994 /* Debug */,
+				3BE4E6DE2DC15DD000232994 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 3BE4E6AD2DC15DCA00232994 /* Project object */;
+}
