@@ -49,6 +49,17 @@ enum AppTheme: String, CaseIterable, Identifiable, Codable {
     }
 }
 
+enum Weekday: Int, CaseIterable, Identifiable {
+    case sunday = 1, monday, tuesday, wednesday, thursday, friday, saturday
+    var id: Int { self.rawValue }
+    
+    var shortName: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US")
+        return formatter.shortWeekdaySymbols[rawValue - 1]
+    }
+}
+
 // MARK: - Color Extensions
 extension Color {
     // African Theme Colors
@@ -84,6 +95,7 @@ struct Task: Identifiable, Codable {
     var endDate: Date
     var color: TaskColor
     var recurrence: Recurrence?
+    var recurrenceDays: [Int]? // Days of week (1=Sunday, 2=Monday, etc.)
     
     enum TaskColor: String, CaseIterable, Codable {
         case red, orange, yellow, green, blue, purple, pink
@@ -97,6 +109,7 @@ struct Task: Identifiable, Codable {
         case yearly = "yearly"
     }
     
+    // Update your initializer to include recurrenceDays
     init(id: UUID = UUID(),
          title: String,
          notes: String = "",
@@ -104,7 +117,8 @@ struct Task: Identifiable, Codable {
          startDate: Date = Date(),
          endDate: Date = Date().addingTimeInterval(3600),
          color: TaskColor = .blue,
-         recurrence: Recurrence? = nil) {
+         recurrence: Recurrence? = nil,
+         recurrenceDays: [Int]? = nil) {
         self.id = id
         self.title = title
         self.notes = notes
@@ -113,6 +127,7 @@ struct Task: Identifiable, Codable {
         self.endDate = endDate
         self.color = color
         self.recurrence = recurrence
+        self.recurrenceDays = recurrenceDays
     }
 }
 
@@ -185,13 +200,6 @@ class TaskStore: ObservableObject {
         saveTasks()
     }
     
-    func tasksForDate(_ date: Date) -> [Task] {
-        let calendar = Calendar.current
-        return tasks.filter {
-            calendar.isDate($0.startDate, inSameDayAs: date)
-        }
-    }
-    
     func tasksForWeek(containing date: Date) -> [Date: [Task]] {
         let calendar = Calendar.current
         let week = calendar.dateInterval(of: .weekOfYear, for: date)
@@ -232,7 +240,7 @@ class TaskStore: ObservableObject {
         return result
     }
     
-    private func saveTasks() {
+    func saveTasks() {
         if let encoded = try? JSONEncoder().encode(tasks) {
             UserDefaults.standard.set(encoded, forKey: "tasks")
         }
@@ -490,374 +498,192 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Task View
+// MARK: Tasks View
+
 struct TaskView: View {
     @EnvironmentObject var settings: SettingsStore
     @ObservedObject var taskStore: TaskStore
     @State private var showingAddTask = false
-    @State private var viewMode: ViewMode = .week
-    
-    enum ViewMode: String, CaseIterable {
-        case day, week, month
-    }
+    @State private var selectedDate = Date()
     
     var body: some View {
         NavigationView {
-            ZStack {
-                settings.currentTheme.backgroundColor
-                    .edgesIgnoringSafeArea(.all)
+            VStack {
+                // Date Picker
+                DatePicker("Select Date",
+                          selection: $selectedDate,
+                          displayedComponents: .date)
+                .datePickerStyle(.graphical)
+                .padding()
+                .background(settings.currentTheme.backgroundColor.opacity(0.8))
+                .cornerRadius(10)
+                .padding(.horizontal)
                 
-                VStack(spacing: 0) {
-                    // Calendar Header
-                    CalendarHeaderView(
-                        selectedDate: $taskStore.selectedDate,
-                        viewMode: $viewMode
-                    )
-                    .padding(.horizontal)
-                    .padding(.top, 8)
-                    
-                    // Calendar Content
-                    switch viewMode {
-                    case .day:
-                        DayView(taskStore: taskStore)
-                    case .week:
-                        WeekView(taskStore: taskStore)
-                    case .month:
-                        MonthView(taskStore: taskStore)
+                // Task List
+                List {
+                    ForEach(filteredTasks) { task in
+                        TaskRow(task: task)
                     }
+                    .onDelete(perform: deleteTask)
                 }
-                .navigationTitle(titleForSelectedDate())
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button(action: {
-                            showingAddTask = true
-                        }) {
-                            Image(systemName: "plus")
-                                .foregroundColor(settings.currentTheme.accentColor)
-                        }
-                        .buttonStyle(PlainButtonStyle()) // Ensures button works properly
+                .listStyle(.plain)
+            }
+            .navigationTitle("Tasks")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        showingAddTask = true
+                    } label: {
+                        Image(systemName: "plus")
+                            .foregroundColor(settings.currentTheme.accentColor)
                     }
                 }
             }
-            // Sheet modifier must be attached to the NavigationView
             .sheet(isPresented: $showingAddTask) {
-                AddTaskView(taskStore: taskStore)
+                AddTaskView(taskStore: taskStore, selectedDate: $selectedDate)
                     .environmentObject(settings)
             }
         }
-        .navigationViewStyle(StackNavigationViewStyle())
     }
     
-    private func titleForSelectedDate() -> String {
-        let formatter = DateFormatter()
-        switch viewMode {
-        case .day:
-            formatter.dateFormat = "EEEE, MMM d, yyyy"
-        case .week:
-            formatter.dateFormat = "MMMM yyyy"
-            return "Week of \(formatter.string(from: taskStore.selectedDate))"
-        case .month:
-            formatter.dateFormat = "MMMM yyyy"
+    private var filteredTasks: [Task] {
+        taskStore.tasks.filter { task in
+            Calendar.current.isDate(task.startDate, inSameDayAs: selectedDate)
         }
-        return formatter.string(from: taskStore.selectedDate)
+        .sorted { $0.startDate < $1.startDate }
+    }
+    
+    private func deleteTask(at offsets: IndexSet) {
+        offsets.forEach { index in
+            let task = filteredTasks[index]
+            if let taskIndex = taskStore.tasks.firstIndex(where: { $0.id == task.id }) {
+                taskStore.tasks.remove(at: taskIndex)
+            }
+        }
+        taskStore.saveTasks()
     }
 }
 
-struct CalendarHeaderView: View {
-    @EnvironmentObject var settings: SettingsStore
-    @Binding var selectedDate: Date
-    @Binding var viewMode: TaskView.ViewMode
-    
-    var body: some View {
-        HStack {
-            Button(action: moveToPrevious) {
-                Image(systemName: "chevron.left")
-                    .foregroundColor(settings.currentTheme.textColor)
-            }
-            
-            Spacer()
-            
-            Picker("View Mode", selection: $viewMode) {
-                ForEach(TaskView.ViewMode.allCases, id: \.self) { mode in
-                    Text(mode.rawValue.capitalized)
-                        .tag(mode)
-                }
-            }
-            .pickerStyle(SegmentedPickerStyle())
-            .frame(width: 200)
-            
-            Spacer()
-            
-            Button(action: moveToNext) {
-                Image(systemName: "chevron.right")
-                    .foregroundColor(settings.currentTheme.textColor)
-            }
-            
-            Button("Today") {
-                selectedDate = Date()
-            }
-            .foregroundColor(settings.currentTheme.accentColor)
-        }
-    }
-    
-    private func moveToPrevious() {
-        withAnimation {
-            let calendar = Calendar.current
-            switch viewMode {
-            case .day:
-                selectedDate = calendar.date(byAdding: .day, value: -1, to: selectedDate)!
-            case .week:
-                selectedDate = calendar.date(byAdding: .weekOfYear, value: -1, to: selectedDate)!
-            case .month:
-                selectedDate = calendar.date(byAdding: .month, value: -1, to: selectedDate)!
-            }
-        }
-    }
-    
-    private func moveToNext() {
-        withAnimation {
-            let calendar = Calendar.current
-            switch viewMode {
-            case .day:
-                selectedDate = calendar.date(byAdding: .day, value: 1, to: selectedDate)!
-            case .week:
-                selectedDate = calendar.date(byAdding: .weekOfYear, value: 1, to: selectedDate)!
-            case .month:
-                selectedDate = calendar.date(byAdding: .month, value: 1, to: selectedDate)!
-            }
-        }
-    }
-}
-
-struct CurrentTimeIndicator: View {
-    @State private var currentTime = Date()
-    @EnvironmentObject var settings: SettingsStore
-    
-    var body: some View {
-        GeometryReader { geometry in
-            let minutes = Calendar.current.component(.hour, from: currentTime) * 60 +
-                          Calendar.current.component(.minute, from: currentTime)
-            let position = CGFloat(minutes) / (24 * 60) * geometry.size.height
-            
-            VStack(spacing: 0) {
-                Rectangle()
-                    .fill(settings.currentTheme.accentColor)
-                    .frame(height: 2)
-                
-                Circle()
-                    .fill(settings.currentTheme.accentColor)
-                    .frame(width: 10, height: 10)
-            }
-            .position(x: geometry.size.width / 2, y: position)
-            .onAppear {
-                Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
-                    currentTime = Date()
-                }
-            }
-        }
-        .frame(height: 24 * 60)
-    }
-}
-
-struct DayView: View {
-    @EnvironmentObject var settings: SettingsStore
-    @ObservedObject var taskStore: TaskStore
-    
-    private let hours = Array(0..<24)
-    
-    var body: some View {
-        ScrollView {
-            ZStack(alignment: .topLeading) {
-                // Time labels
-                VStack(alignment: .trailing, spacing: 0) {
-                    ForEach(hours, id: \.self) { hour in
-                        HourRow(hour: hour)
-                            .frame(height: 60)
-                    }
-                }
-                .frame(width: 60)
-                .padding(.trailing, 8)
-                
-                // Events grid
-                GeometryReader { geometry in
-                    ForEach(taskStore.tasksForDate(taskStore.selectedDate)) { task in
-                        CalendarEvent(task: task, parentWidth: geometry.size.width - 70)
-                    }
-                }
-                .padding(.leading, 70)
-            }
-            .padding()
-        }
-    }
-}
-
-struct HourRow: View {
-    @EnvironmentObject var settings: SettingsStore
-    let hour: Int
-    
-    var body: some View {
-        HStack {
-            Text("\(hour == 0 ? 12 : hour > 12 ? hour - 12 : hour) \(hour < 12 ? "AM" : "PM")")
-                .font(.caption)
-                .foregroundColor(settings.currentTheme.textColor.opacity(0.7))
-            
-            Rectangle()
-                .fill(settings.currentTheme.textColor.opacity(0.2))
-                .frame(height: 1)
-        }
-    }
-}
-
-struct CalendarEvent: View {
+// TaskRow.swift
+struct TaskRow: View {
     @EnvironmentObject var settings: SettingsStore
     let task: Task
-    let parentWidth: CGFloat
-    
-    private var startPosition: CGFloat {
-        let calendar = Calendar.current
-        let hour = calendar.component(.hour, from: task.startDate)
-        let minute = calendar.component(.minute, from: task.startDate)
-        return CGFloat(hour * 60 + minute)
-    }
-    
-    private var duration: CGFloat {
-        let duration = task.endDate.timeIntervalSince(task.startDate) / 60
-        return CGFloat(duration)
-    }
     
     var body: some View {
-        VStack(alignment: .leading) {
-            Text(task.title)
-                .font(.subheadline)
-                .foregroundColor(.white)
-                .lineLimit(1)
-            
-            Text("\(DateFormatter.timeFormatter.string(from: task.startDate)) - \(DateFormatter.timeFormatter.string(from: task.endDate))")
-                .font(.caption2)
-                .foregroundColor(.white.opacity(0.8))
-        }
-        .padding(8)
-        .frame(width: parentWidth - 16, height: duration)
-        .background(Color(task.color.rawValue))
-        .cornerRadius(8)
-        .offset(y: startPosition)
-    }
-}
-
-struct WeekView: View {
-    @EnvironmentObject var settings: SettingsStore
-    @ObservedObject var taskStore: TaskStore
-    
-    private let days = Array(0..<7)
-    
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                // Day headers
-                HStack(spacing: 0) {
-                    Color.clear
-                        .frame(width: 60, height: 40)
-                    
-                    ForEach(days, id: \.self) { day in
-                        let date = Calendar.current.date(byAdding: .day, value: day, to: weekStartDate())!
-                        DayHeader(date: date)
-                    }
-                }
+        HStack(alignment: .top, spacing: 12) {
+            // Time indicator
+            VStack(alignment: .leading) {
+                Text(task.startDate, style: .time)
+                    .font(.subheadline)
+                    .foregroundColor(settings.currentTheme.textColor)
                 
-                // Time grid
-                HStack(spacing: 0) {
-                    TimeColumn()
-                    
-                    ForEach(days, id: \.self) { day in
-                        let date = Calendar.current.date(byAdding: .day, value: day, to: weekStartDate())!
-                        DayColumn(taskStore: taskStore, date: date)
-                    }
+                if task.startDate != task.endDate {
+                    Text(task.endDate, style: .time)
+                        .font(.caption)
+                        .foregroundColor(settings.currentTheme.textColor.opacity(0.7))
                 }
             }
+            .frame(width: 60)
+            
+            // Task details
+            VStack(alignment: .leading, spacing: 4) {
+                Text(task.title)
+                    .font(.headline)
+                    .foregroundColor(settings.currentTheme.textColor)
+                
+                if !task.notes.isEmpty {
+                    Text(task.notes)
+                        .font(.subheadline)
+                        .foregroundColor(settings.currentTheme.textColor.opacity(0.7))
+                }
+            }
+            
+            Spacer()
+            
+            // Color indicator
+            Circle()
+                .fill(Color(task.color.rawValue))
+                .frame(width: 12, height: 12)
         }
-    }
-    
-    private func weekStartDate() -> Date {
-        Calendar.current.date(from: Calendar.current.dateComponents([.yearForWeekOfYear, .weekOfYear], from: taskStore.selectedDate))!
+        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .background(settings.currentTheme.backgroundColor.opacity(0.2))
+        .cornerRadius(8)
     }
 }
 
-struct MonthView: View {
-    @EnvironmentObject var settings: SettingsStore
-    @ObservedObject var taskStore: TaskStore
-    
-    private let columns = Array(repeating: GridItem(.flexible()), count: 7)
-    
-    var body: some View {
-        ScrollView {
-            LazyVGrid(columns: columns, spacing: 8) {
-                ForEach(daysInMonth(), id: \.self) { date in
-                    DayCell(taskStore: taskStore, date: date)
-                }
-            }
-            .padding()
-        }
-    }
-    
-    private func daysInMonth() -> [Date] {
-        let calendar = Calendar.current
-        guard let monthInterval = calendar.dateInterval(of: .month, for: taskStore.selectedDate),
-              let monthFirstWeek = calendar.dateInterval(of: .weekOfMonth, for: monthInterval.start),
-              let monthLastWeek = calendar.dateInterval(of: .weekOfMonth, for: monthInterval.end) else {
-            return []
-        }
-        
-        let dateInterval = DateInterval(start: monthFirstWeek.start, end: monthLastWeek.end)
-        return calendar.generateDates(for: dateInterval, matching: DateComponents(hour: 0, minute: 0, second: 0))
-    }
-}
-
+// AddTaskView.swift
 struct AddTaskView: View {
     @EnvironmentObject var settings: SettingsStore
     @ObservedObject var taskStore: TaskStore
+    @Binding var selectedDate: Date
     @Environment(\.presentationMode) var presentationMode
     
     @State private var title = ""
     @State private var notes = ""
     @State private var startDate = Date()
-    @State private var endDate = Date().addingTimeInterval(3600) // 1 hour later
+    @State private var endDate = Date().addingTimeInterval(3600)
     @State private var color: Task.TaskColor = .blue
-    @State private var recurrence: Task.Recurrence = .none
+    @State private var isAllDay = false
+    @State private var recurrenceOption: RecurrenceOption = .none
+    @State private var selectedDays: Set<Weekday> = []
+    
+    enum RecurrenceOption: String, CaseIterable {
+        case none = "Does not repeat"
+        case daily = "Daily"
+        case weekly = "Weekly on selected days"
+        case weekdays = "Weekdays (Mon-Fri)"
+        case weekends = "Weekends (Sat-Sun)"
+    }
     
     var body: some View {
         NavigationView {
             Form {
                 Section(header: Text("Task Details").foregroundColor(settings.currentTheme.accentColor)) {
                     TextField("Title", text: $title)
-                    TextField("Notes", text: $notes)
+                    TextField("Notes (optional)", text: $notes)
                     
-                    DatePicker("Start Time", selection: $startDate, displayedComponents: [.date, .hourAndMinute])
-                    DatePicker("End Time", selection: $endDate, in: startDate..., displayedComponents: [.date, .hourAndMinute])
+                    Toggle("All-day", isOn: $isAllDay)
+                    
+                    if !isAllDay {
+                        DatePicker("Start Time",
+                                 selection: $startDate,
+                                 displayedComponents: .hourAndMinute)
+                        DatePicker("End Time",
+                                 selection: $endDate,
+                                 in: startDate...,
+                                 displayedComponents: .hourAndMinute)
+                    }
                     
                     Picker("Color", selection: $color) {
                         ForEach(Task.TaskColor.allCases, id: \.self) { color in
                             Text(color.rawValue.capitalized).tag(color)
                         }
                     }
-                    
-                    Picker("Recurrence", selection: $recurrence) {
-                        ForEach(Task.Recurrence.allCases, id: \.self) { recurrence in
-                            Text(recurrence.rawValue.capitalized).tag(recurrence)
+                }
+                
+                Section(header: Text("Recurrence").foregroundColor(settings.currentTheme.accentColor)) {
+                    Picker("Repeat", selection: $recurrenceOption) {
+                        ForEach(RecurrenceOption.allCases, id: \.self) { option in
+                            Text(option.rawValue).tag(option)
                         }
+                    }
+                    .pickerStyle(.menu)
+                    
+                    if recurrenceOption == .weekly {
+                        WeekdaySelectionView(selectedDays: $selectedDays)
                     }
                 }
                 
                 Section {
-                    Button(action: addTask) {
-                        Text("Add Task")
-                            .frame(maxWidth: .infinity)
+                    Button("Add Task") {
+                        addTask()
                     }
                     .disabled(title.isEmpty)
+                    .frame(maxWidth: .infinity)
                 }
             }
             .navigationTitle("New Task")
-            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
@@ -865,158 +691,111 @@ struct AddTaskView: View {
                     }
                 }
             }
+            .onAppear {
+                let calendar = Calendar.current
+                let components = calendar.dateComponents([.year, .month, .day], from: selectedDate)
+                startDate = calendar.date(from: components) ?? Date()
+                endDate = calendar.date(byAdding: .hour, value: 1, to: startDate) ?? Date()
+                
+                // Preselect current day for weekly recurrence
+                let weekday = calendar.component(.weekday, from: selectedDate)
+                if let currentWeekday = Weekday(rawValue: weekday) {
+                    selectedDays = [currentWeekday]
+                }
+            }
         }
     }
     
     private func addTask() {
+        var recurrence: Task.Recurrence?
+        var recurrenceDays: [Int]?
+        
+        switch recurrenceOption {
+        case .none:
+            recurrence = nil
+            recurrenceDays = nil
+            
+        case .daily:
+            recurrence = .daily
+            recurrenceDays = nil
+            
+        case .weekly:
+            recurrence = .weekly
+            recurrenceDays = selectedDays.map { $0.rawValue }.sorted()
+            
+        case .weekdays:
+            recurrence = .weekly
+            recurrenceDays = [2, 3, 4, 5, 6] // Mon-Fri
+            
+        case .weekends:
+            recurrence = .weekly
+            recurrenceDays = [1, 7] // Sat-Sun
+        }
+        
         let newTask = Task(
             title: title,
             notes: notes,
-            startDate: startDate,
-            endDate: endDate,
+            startDate: isAllDay ? startDate.startOfDay : startDate,
+            endDate: isAllDay ? startDate.endOfDay : endDate,
             color: color,
-            recurrence: recurrence
+            recurrence: recurrence,
+            recurrenceDays: recurrenceDays
         )
+        
         taskStore.addTask(newTask)
         presentationMode.wrappedValue.dismiss()
-    }
-}
+    }}
 
-struct DayCell: View {
+struct WeekdaySelectionView: View {
     @EnvironmentObject var settings: SettingsStore
-    @ObservedObject var taskStore: TaskStore
-    let date: Date
-    
-    private var isCurrentMonth: Bool {
-        Calendar.current.isDate(date, equalTo: taskStore.selectedDate, toGranularity: .month)
-    }
-    
-    private var isToday: Bool {
-        Calendar.current.isDateInToday(date)
-    }
+    @Binding var selectedDays: Set<Weekday>
     
     var body: some View {
-        VStack(spacing: 4) {
-            Text("\(Calendar.current.component(.day, from: date))")
-                .font(.system(size: 14))
-                .foregroundColor(
-                    isToday ? settings.currentTheme.accentColor :
-                    isCurrentMonth ? settings.currentTheme.textColor :
-                    settings.currentTheme.textColor.opacity(0.5)
-                )
-                .frame(width: 24, height: 24)
-                .background(isToday ? settings.currentTheme.accentColor.opacity(0.2) : Color.clear)
-                .clipShape(Circle())
-            
-            ForEach(taskStore.tasksForDate(date).prefix(2)) { task in
-                Text(task.title)
-                    .font(.caption2)
-                    .lineLimit(1)
-                    .padding(4)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(task.color.rawValue).opacity(0.7))
-                    .foregroundColor(.white)
-                    .cornerRadius(4)
-            }
-            
-            if taskStore.tasksForDate(date).count > 2 {
-                Text("+\(taskStore.tasksForDate(date).count - 2) more")
-                    .font(.caption2)
-                    .foregroundColor(settings.currentTheme.accentColor)
-            }
-        }
-        .padding(4)
-        .frame(height: 80)
-        .background(
-            isCurrentMonth ? settings.currentTheme.backgroundColor :
-            settings.currentTheme.backgroundColor.opacity(0.5)
-        )
-        .cornerRadius(8)
-        .onTapGesture {
-            withAnimation {
-                taskStore.selectedDate = date
-            }
-        }
-    }
-}
-
-struct DayHeader: View {
-    @EnvironmentObject var settings: SettingsStore
-    let date: Date
-    
-    var body: some View {
-        VStack {
-            Text(DateFormatter.dayFormatter.string(from: date).prefix(3))
-                .font(.caption)
-                .foregroundColor(settings.currentTheme.textColor)
-            
-            Text(DateFormatter.dateFormatter.string(from: date))
-                .font(.caption2)
+        VStack(alignment: .leading) {
+            Text("Repeat on:")
+                .font(.subheadline)
                 .foregroundColor(settings.currentTheme.textColor.opacity(0.7))
+            
+            HStack {
+                ForEach(Weekday.allCases) { day in
+                    Button(action: {
+                        if selectedDays.contains(day) {
+                            selectedDays.remove(day)
+                        } else {
+                            selectedDays.insert(day)
+                        }
+                    }) {
+                        Text(day.shortName)
+                            .font(.caption)
+                            .frame(width: 32, height: 32)
+                            .background(selectedDays.contains(day) ?
+                                        settings.currentTheme.accentColor :
+                                        settings.currentTheme.backgroundColor.opacity(0.3))
+                            .foregroundColor(selectedDays.contains(day) ?
+                                            .white :
+                                            settings.currentTheme.textColor)
+                            .cornerRadius(16)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+            }
         }
-        .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
-        .background(settings.currentTheme.backgroundColor.opacity(0.8))
-        .overlay(
-            Rectangle()
-                .frame(width: 1, height: nil, alignment: .trailing)
-                .foregroundColor(settings.currentTheme.textColor.opacity(0.2)),
-            alignment: .trailing
-        )
     }
 }
 
-struct TimeColumn: View {
-    @EnvironmentObject var settings: SettingsStore
-    private let hours = Array(0..<24)
-    
-    var body: some View {
-        VStack(spacing: 0) {
-            ForEach(hours, id: \.self) { hour in
-                Text("\(hour == 0 ? 12 : hour > 12 ? hour - 12 : hour) \(hour < 12 ? "AM" : "PM")")
-                    .font(.caption2)
-                    .foregroundColor(settings.currentTheme.textColor.opacity(0.7))
-                    .frame(width: 60, height: 60, alignment: .topTrailing)
-                    .padding(.trailing, 4)
-                    .overlay(
-                        Rectangle()
-                            .frame(height: 1, alignment: .bottom)
-                            .foregroundColor(settings.currentTheme.textColor.opacity(0.1)),
-                        alignment: .bottom
-                    )
-            }
-        }
-    }
-}
 
-struct DayColumn: View {
-    @EnvironmentObject var settings: SettingsStore
-    @ObservedObject var taskStore: TaskStore
-    let date: Date
+// Date Extensions
+extension Date {
+    var startOfDay: Date {
+        Calendar.current.startOfDay(for: self)
+    }
     
-    var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                // Background grid
-                ForEach(0..<24, id: \.self) { _ in
-                    Rectangle()
-                        .frame(height: 1)
-                        .foregroundColor(settings.currentTheme.textColor.opacity(0.1))
-                }
-                
-                // Events
-                ForEach(taskStore.tasksForDate(date)) { task in
-                    CalendarEvent(task: task, parentWidth: geometry.size.width)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .overlay(
-            Rectangle()
-                .frame(width: 1, height: nil, alignment: .trailing)
-                .foregroundColor(settings.currentTheme.textColor.opacity(0.2)),
-            alignment: .trailing
-        )
+    var endOfDay: Date {
+        var components = DateComponents()
+        components.day = 1
+        components.second = -1
+        return Calendar.current.date(byAdding: components, to: startOfDay) ?? self
     }
 }
 
@@ -2058,3 +1837,56 @@ extension DateFormatter {
         return formatter
     }
 }
+
+extension TaskStore {
+    func tasksForDate(_ date: Date) -> [Task] {
+        let calendar = Calendar.current
+        let requestedDay = calendar.component(.day, from: date)
+        let requestedMonth = calendar.component(.month, from: date)
+        let requestedWeekday = calendar.component(.weekday, from: date)
+        
+        return tasks.filter { task in
+            // Get components of the task's start date
+            let taskDay = calendar.component(.day, from: task.startDate)
+            let taskMonth = calendar.component(.month, from: task.startDate)
+            let taskWeekday = calendar.component(.weekday, from: task.startDate)
+            
+            // Check if it's the exact date
+            if calendar.isDate(task.startDate, inSameDayAs: date) {
+                return true
+            }
+            
+            // Check if this is a recurring task and the date is after the original task date
+            guard let recurrence = task.recurrence, date > task.startDate else {
+                return false
+            }
+            
+            switch recurrence {
+            case .daily:
+                return true
+                
+            case .weekly:
+                if let recurrenceDays = task.recurrenceDays {
+                    return recurrenceDays.contains(requestedWeekday)
+                } else {
+                    // If no specific days set, use the original task's weekday
+                    return requestedWeekday == taskWeekday
+                }
+                
+            case .monthly:
+                return requestedDay == taskDay
+                
+            case .yearly:
+                return requestedDay == taskDay && requestedMonth == taskMonth
+                
+            case .none:
+                return false
+            }
+        }
+    }
+}
+
+
+
+
+
