@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 
 // MARK: - Theme System
 enum AppTheme: String, CaseIterable, Identifiable, Codable {
@@ -86,6 +87,87 @@ extension Color {
 }
 
 // MARK: - Models
+struct HistoryCourse: Identifiable, Codable {
+    let id: UUID
+    let title: String
+    let description: String
+    let durationInDays: Int
+    var days: [HistoryDay]
+    var isEnrolled: Bool
+    var currentDay: Int
+    var startDate: Date?
+    var completedDays: [Int]
+    
+    init(id: UUID = UUID(),
+         title: String,
+         description: String,
+         durationInDays: Int = 30,
+         days: [HistoryDay] = [],
+         isEnrolled: Bool = false,
+         currentDay: Int = 0,
+         startDate: Date? = nil,
+         completedDays: [Int] = []) {
+        self.id = id
+        self.title = title
+        self.description = description
+        self.durationInDays = durationInDays
+        self.days = days
+        self.isEnrolled = isEnrolled
+        self.currentDay = currentDay
+        self.startDate = startDate
+        self.completedDays = completedDays
+    }
+}
+
+struct HistoryDay: Identifiable, Codable {
+    let id: UUID
+    let dayNumber: Int
+    let title: String
+    let essay: String
+    let keyPoints: [String]
+    let reflectionQuestion: String
+    let recommendedReading: String?
+    let videoURL: String?
+    
+    init(id: UUID = UUID(),
+         dayNumber: Int,
+         title: String,
+         essay: String,
+         keyPoints: [String],
+         reflectionQuestion: String,
+         recommendedReading: String? = nil,
+         videoURL: String? = nil) {
+        self.id = id
+        self.dayNumber = dayNumber
+        self.title = title
+        self.essay = essay
+        self.keyPoints = keyPoints
+        self.reflectionQuestion = reflectionQuestion
+        self.recommendedReading = recommendedReading
+        self.videoURL = videoURL
+    }
+}
+
+struct HistoryReflection: Identifiable, Codable {
+    let id: UUID
+    let dayNumber: Int
+    let date: Date
+    let answer: String
+    let notes: String
+    
+    init(id: UUID = UUID(),
+         dayNumber: Int,
+         date: Date = Date(),
+         answer: String,
+         notes: String = "") {
+        self.id = id
+        self.dayNumber = dayNumber
+        self.date = date
+        self.answer = answer
+        self.notes = notes
+    }
+}
+
 struct Task: Identifiable, Codable {
     let id: UUID
     var title: String
@@ -238,29 +320,161 @@ struct HealthRecord: Identifiable, Codable {
 }
 
 struct StatusRecord: Identifiable, Codable {
-    let id: UUID
+    var id = UUID()
     let date: Date
-    var followers: Int
-    var posts: Int
-    var engagement: Double // percentage
-    var minutesSpent: Int
-    
-    init(id: UUID = UUID(),
-         date: Date = Date(),
-         followers: Int = 0,
-         posts: Int = 0,
-         engagement: Double = 0,
-         minutesSpent: Int = 0) {
-        self.id = id
-        self.date = date
-        self.followers = followers
-        self.posts = posts
-        self.engagement = engagement
-        self.minutesSpent = minutesSpent
-    }
+    var postsCreated: Int
+    var storiesCreated: Int
+    var reelsCreated: Int
+    var commentsMade: Int
+    var minutesEngaged: Int
+    var outreachMessages: Int
 }
 
 // MARK: - ViewModels
+class HistoryStore: ObservableObject {
+    @Published var courses: [HistoryCourse] = []
+    @Published var reflections: [HistoryReflection] = []
+    @Published var speechSynthesizer = SpeechSynthesizer()
+    
+    init() {
+        loadData()
+        if courses.isEmpty {
+            initializeSampleCourses()
+        }
+    }
+    
+    // MARK: - Course Management
+    func enrollInCourse(courseId: UUID) {
+        if let index = courses.firstIndex(where: { $0.id == courseId }) {
+            courses[index].isEnrolled = true
+            courses[index].startDate = Date()
+            courses[index].currentDay = 1
+            saveData()
+        }
+    }
+    
+    func completeCurrentDay(courseId: UUID, reflectionAnswer: String, notes: String = "") {
+        guard let courseIndex = courses.firstIndex(where: { $0.id == courseId }),
+              courses[courseIndex].isEnrolled,
+              courses[courseIndex].currentDay <= courses[courseIndex].durationInDays else {
+            return
+        }
+        
+        let currentDay = courses[courseIndex].currentDay
+        
+        // Add reflection
+        let reflection = HistoryReflection(
+            dayNumber: currentDay,
+            answer: reflectionAnswer,
+            notes: notes
+        )
+        reflections.append(reflection)
+        
+        // Mark day as completed
+        if !courses[courseIndex].completedDays.contains(currentDay) {
+            courses[courseIndex].completedDays.append(currentDay)
+        }
+        
+        // Move to next day if not at end
+        if currentDay < courses[courseIndex].durationInDays {
+            courses[courseIndex].currentDay += 1
+        }
+        
+        saveData()
+    }
+    
+    func getCurrentDayContent(courseId: UUID) -> HistoryDay? {
+        guard let course = courses.first(where: { $0.id == courseId }),
+              course.isEnrolled,
+              course.currentDay <= course.durationInDays,
+              let dayContent = course.days.first(where: { $0.dayNumber == course.currentDay }) else {
+            return nil
+        }
+        return dayContent
+    }
+    
+    // MARK: - Text-to-Speech
+    func speak(text: String) {
+        speechSynthesizer.speak(text: text)
+    }
+    
+    func stopSpeaking() {
+        speechSynthesizer.stopSpeaking()
+    }
+    
+    // MARK: - Data Persistence
+    private func saveData() {
+        if let encodedCourses = try? JSONEncoder().encode(courses) {
+            UserDefaults.standard.set(encodedCourses, forKey: "historyCourses")
+        }
+        if let encodedReflections = try? JSONEncoder().encode(reflections) {
+            UserDefaults.standard.set(encodedReflections, forKey: "historyReflections")
+        }
+    }
+    
+    private func loadData() {
+        if let coursesData = UserDefaults.standard.data(forKey: "historyCourses"),
+           let decodedCourses = try? JSONDecoder().decode([HistoryCourse].self, from: coursesData) {
+            courses = decodedCourses
+        }
+        if let reflectionsData = UserDefaults.standard.data(forKey: "historyReflections"),
+           let decodedReflections = try? JSONDecoder().decode([HistoryReflection].self, from: reflectionsData) {
+            reflections = decodedReflections
+        }
+    }
+    
+    // MARK: - Sample Data
+    private func initializeSampleCourses() {
+        // Create a 30-day African History course
+        var africanHistoryDays: [HistoryDay] = []
+        
+        for day in 1...30 {
+            africanHistoryDays.append(HistoryDay(
+                dayNumber: day,
+                title: "African History Day \(day)",
+                essay: "This is a detailed essay about African history for day \(day). It covers important events, figures, and cultural aspects that shaped the continent. The content would be much more detailed in a real implementation, with proper historical research and citations.",
+                keyPoints: [
+                    "Key point 1 for day \(day)",
+                    "Key point 2 for day \(day)",
+                    "Key point 3 for day \(day)"
+                ],
+                reflectionQuestion: "What did you find most interesting about today's lesson?",
+                recommendedReading: "Recommended book for day \(day)",
+                videoURL: "https://example.com/video/day\(day)"
+            ))
+        }
+        
+        let africanHistoryCourse = HistoryCourse(
+            title: "30 Days of African History",
+            description: "A comprehensive journey through African history, covering ancient civilizations, colonialism, independence movements, and modern developments.",
+            durationInDays: 30,
+            days: africanHistoryDays
+        )
+        
+        courses = [africanHistoryCourse]
+        saveData()
+    }
+}
+
+// Text-to-Speech Helper
+class SpeechSynthesizer {
+    private let synthesizer = AVSpeechSynthesizer()
+    
+    func speak(text: String) {
+        stopSpeaking()
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+        utterance.rate = 0.5
+        synthesizer.speak(utterance)
+    }
+    
+    func stopSpeaking() {
+        if synthesizer.isSpeaking {
+            synthesizer.stopSpeaking(at: .immediate)
+        }
+    }
+}
+
 class TaskStore: ObservableObject {
     @Published var tasks: [Task] = []
     @Published var selectedDate = Date()
@@ -550,54 +764,116 @@ class HealthStore: ObservableObject {
 }
 
 class StatusStore: ObservableObject {
-    @Published var records: [StatusRecord] = []
+    @Published var platforms: [Platform] = []
+    @Published var dailyMetrics: [DailyMetric] = []
     
     init() {
-        loadRecords()
-    }
-    
-    func addRecord(followers: Int, posts: Int, engagement: Double, minutesSpent: Int, date: Date = Date()) {
-        let newRecord = StatusRecord(date: date, followers: followers, posts: posts, engagement: engagement, minutesSpent: minutesSpent)
-        records.append(newRecord)
-        saveRecords()
-    }
-    
-    func weeklyGrowth() -> (followers: Int, posts: Int, engagement: Double, minutes: Int) {
-        let calendar = Calendar.current
-        let currentWeek = calendar.component(.weekOfYear, from: Date())
-        let weeklyRecords = records.filter {
-            calendar.component(.weekOfYear, from: $0.date) == currentWeek
-        }
-        
-        guard !weeklyRecords.isEmpty else { return (0, 0, 0, 0) }
-        
-        let firstRecord = weeklyRecords.first!
-        let lastRecord = weeklyRecords.last!
-        
-        return (
-            lastRecord.followers - firstRecord.followers,
-            lastRecord.posts - firstRecord.posts,
-            lastRecord.engagement - firstRecord.engagement,
-            weeklyRecords.reduce(0) { $0 + $1.minutesSpent }
-        )
-    }
-    
-    private func saveRecords() {
-        if let encoded = try? JSONEncoder().encode(records) {
-            UserDefaults.standard.set(encoded, forKey: "statusRecords")
+        loadData()
+        if platforms.isEmpty {
+            // Initialize with common platforms if empty
+            platforms = [
+                Platform(name: "Instagram", icon: "camera"),
+                Platform(name: "Twitter", icon: "bird"),
+                Platform(name: "TikTok", icon: "music.note"),
+                Platform(name: "YouTube", icon: "play.rectangle"),
+                Platform(name: "LinkedIn", icon: "briefcase")
+            ]
+            saveData()
         }
     }
     
-    private func loadRecords() {
-        if let data = UserDefaults.standard.data(forKey: "statusRecords"),
-           let decoded = try? JSONDecoder().decode([StatusRecord].self, from: data) {
-            records = decoded
+    // Platform management (permanent)
+    func addPlatform(name: String, icon: String) {
+        guard platforms.count < 5 else { return }
+        let newPlatform = Platform(name: name, icon: icon)
+        platforms.append(newPlatform)
+        saveData()
+    }
+    
+    // Daily metrics (reset each day)
+    func incrementMetric(for platformId: UUID, metric: MetricType) {
+        let today = Calendar.current.startOfDay(for: Date())
+        
+        // Find or create today's record
+        if let index = dailyMetrics.firstIndex(where: { Calendar.current.isDate($0.date, inSameDayAs: today) }) {
+            dailyMetrics[index].increment(metric: metric, platformId: platformId)
+        } else {
+            var newMetric = DailyMetric(date: today)
+            newMetric.increment(metric: metric, platformId: platformId)
+            dailyMetrics.append(newMetric)
+        }
+        
+        saveData()
+    }
+    
+    func getTodayMetrics() -> DailyMetric {
+        let today = Calendar.current.startOfDay(for: Date())
+        return dailyMetrics.first { Calendar.current.isDate($0.date, inSameDayAs: today) } ?? DailyMetric(date: today)
+    }
+    
+    // Data persistence
+    private func saveData() {
+        let encoder = JSONEncoder()
+        if let encodedPlatforms = try? encoder.encode(platforms),
+           let encodedMetrics = try? encoder.encode(dailyMetrics) {
+            UserDefaults.standard.set(encodedPlatforms, forKey: "platforms")
+            UserDefaults.standard.set(encodedMetrics, forKey: "dailyMetrics")
+        }
+    }
+    
+    private func loadData() {
+        let decoder = JSONDecoder()
+        if let platformsData = UserDefaults.standard.data(forKey: "platforms"),
+           let decodedPlatforms = try? decoder.decode([Platform].self, from: platformsData) {
+            platforms = decodedPlatforms
+        }
+        if let metricsData = UserDefaults.standard.data(forKey: "dailyMetrics"),
+           let decodedMetrics = try? decoder.decode([DailyMetric].self, from: metricsData) {
+            dailyMetrics = decodedMetrics
         }
     }
 }
 
+struct Platform: Identifiable, Codable, Equatable {
+    var id = UUID()
+    let name: String
+    let icon: String
+}
+
+struct DailyMetric: Identifiable, Codable {
+    var id = UUID()
+    let date: Date
+    var posts: [UUID: Int] = [:] // Platform ID: Count
+    var comments: [UUID: Int] = [:] // Platform ID: Count
+    var minutes: [UUID: Int] = [:] // Platform ID: Count
+    
+    mutating func increment(metric: MetricType, platformId: UUID) {
+        switch metric {
+        case .post:
+            posts[platformId] = (posts[platformId] ?? 0) + 1
+        case .comment:
+            comments[platformId] = (comments[platformId] ?? 0) + 1
+        case .minute:
+            minutes[platformId] = (minutes[platformId] ?? 0) + 1
+        }
+    }
+    
+    func count(for metric: MetricType, platformId: UUID) -> Int {
+        switch metric {
+        case .post: return posts[platformId] ?? 0
+        case .comment: return comments[platformId] ?? 0
+        case .minute: return minutes[platformId] ?? 0
+        }
+    }
+}
+
+enum MetricType {
+    case post, comment, minute
+}
+
 class RevisionStore: ObservableObject {
     @Published var dailyRevisions: [DailyRevision] = []
+    @Published var weeklyRetrospectives: [WeeklyRetrospective] = []
     
     struct DailyRevision: Identifiable, Codable {
         let id: UUID
@@ -606,25 +882,94 @@ class RevisionStore: ObservableObject {
         var whatToImprove: String
         var lessonsLearned: String
         var tomorrowFocus: String
+        var energyLevel: Int // 1-5 scale
+        var mood: Mood
+        var keyAchievements: [String]
+        var gratitudeList: [String]
+        
+        enum Mood: String, CaseIterable, Codable {
+            case terrible = "😞"
+            case bad = "🙁"
+            case neutral = "😐"
+            case good = "🙂"
+            case great = "😄"
+            
+            var description: String {
+                switch self {
+                case .terrible: return "Terrible"
+                case .bad: return "Bad"
+                case .neutral: return "Neutral"
+                case .good: return "Good"
+                case .great: return "Great"
+                }
+            }
+        }
         
         init(id: UUID = UUID(),
              date: Date = Date(),
              whatWentWell: String = "",
              whatToImprove: String = "",
              lessonsLearned: String = "",
-             tomorrowFocus: String = "") {
+             tomorrowFocus: String = "",
+             energyLevel: Int = 3,
+             mood: Mood = .neutral,
+             keyAchievements: [String] = [],
+             gratitudeList: [String] = []) {
             self.id = id
             self.date = date
             self.whatWentWell = whatWentWell
             self.whatToImprove = whatToImprove
             self.lessonsLearned = lessonsLearned
             self.tomorrowFocus = tomorrowFocus
+            self.energyLevel = energyLevel
+            self.mood = mood
+            self.keyAchievements = keyAchievements
+            self.gratitudeList = gratitudeList
         }
     }
     
+    struct WeeklyRetrospective: Identifiable, Codable {
+        let id: UUID
+        let startDate: Date
+        let endDate: Date
+        var weeklyWins: [String]
+        var biggestChallenges: [String]
+        var keyLearnings: [String]
+        var improvementPlan: [String]
+        var rating: Int // 1-10 scale
+        
+        init(id: UUID = UUID(),
+             startDate: Date = Date().startOfWeek,
+             endDate: Date = Date().endOfWeek,
+             weeklyWins: [String] = [],
+             biggestChallenges: [String] = [],
+             keyLearnings: [String] = [],
+             improvementPlan: [String] = [],
+             rating: Int = 5) {
+            self.id = id
+            self.startDate = startDate
+            self.endDate = endDate
+            self.weeklyWins = weeklyWins
+            self.biggestChallenges = biggestChallenges
+            self.keyLearnings = keyLearnings
+            self.improvementPlan = improvementPlan
+            self.rating = rating
+        }
+    }
+    
+    // MARK: - Daily Revision Methods
     func addRevision(_ revision: DailyRevision) {
-        dailyRevisions.append(revision)
+        if let index = dailyRevisions.firstIndex(where: { Calendar.current.isDate($0.date, inSameDayAs: revision.date) }) {
+            dailyRevisions[index] = revision
+        } else {
+            dailyRevisions.append(revision)
+        }
         saveRevisions()
+        
+        // Check if we should create a weekly retrospective
+        if shouldCreateWeeklyRetrospective() {
+            createWeeklyRetrospective()
+        }
     }
     
     func getTodaysRevision() -> DailyRevision {
@@ -633,9 +978,81 @@ class RevisionStore: ObservableObject {
                DailyRevision(date: today)
     }
     
+    func getRevisionsForWeek(containing date: Date) -> [DailyRevision] {
+        let calendar = Calendar.current
+        guard let weekInterval = calendar.dateInterval(of: .weekOfYear, for: date) else { return [] }
+        
+        return dailyRevisions.filter {
+            calendar.isDate($0.date, inSameDayAs: weekInterval.start) ||
+            ($0.date > weekInterval.start && $0.date < weekInterval.end)
+        }
+    }
+    
+    // MARK: - Weekly Retrospective Methods
+    private func shouldCreateWeeklyRetrospective() -> Bool {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        
+        // Check if today is Sunday (end of week)
+        let isEndOfWeek = calendar.component(.weekday, from: today) == 1 // 1 = Sunday
+        
+        // Check if we already have a retrospective for this week
+        let hasRetrospective = weeklyRetrospectives.contains { retrospective in
+            calendar.isDate(today, equalTo: retrospective.endDate, toGranularity: .day)
+        }
+        
+        // Check if we have at least 3 days of data
+        let daysThisWeek = getRevisionsForWeek(containing: today).count
+        
+        return isEndOfWeek && !hasRetrospective && daysThisWeek >= 3
+    }
+    
+    private func createWeeklyRetrospective() {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let startOfWeek = today.startOfWeek
+        let endOfWeek = today.endOfWeek
+        
+        let weekRevisions = getRevisionsForWeek(containing: today)
+        
+        // Aggregate data from daily revisions
+        var weeklyWins: [String] = []
+        var challenges: [String] = []
+        var learnings: [String] = []
+        
+        for revision in weekRevisions {
+            weeklyWins.append(contentsOf: revision.keyAchievements)
+            challenges.append(revision.whatToImprove)
+            learnings.append(revision.lessonsLearned)
+        }
+        
+        // Calculate average rating
+        let averageRating = weekRevisions.isEmpty ? 5 :
+            (weekRevisions.reduce(0) { $0 + $1.energyLevel } / weekRevisions.count)
+        
+        let retrospective = WeeklyRetrospective(
+            startDate: startOfWeek,
+            endDate: endOfWeek,
+            weeklyWins: weeklyWins,
+            biggestChallenges: Array(Set(challenges)), // Remove duplicates
+            keyLearnings: Array(Set(learnings)), // Remove duplicates
+            rating: averageRating
+        )
+        
+        weeklyRetrospectives.append(retrospective)
+        saveWeeklyRetrospectives()
+    }
+    
+    // MARK: - Data Persistence
     private func saveRevisions() {
         if let encoded = try? JSONEncoder().encode(dailyRevisions) {
             UserDefaults.standard.set(encoded, forKey: "dailyRevisions")
+        }
+    }
+    
+    private func saveWeeklyRetrospectives() {
+        if let encoded = try? JSONEncoder().encode(weeklyRetrospectives) {
+            UserDefaults.standard.set(encoded, forKey: "weeklyRetrospectives")
         }
     }
     
@@ -646,8 +1063,16 @@ class RevisionStore: ObservableObject {
         }
     }
     
+    private func loadWeeklyRetrospectives() {
+        if let data = UserDefaults.standard.data(forKey: "weeklyRetrospectives"),
+           let decoded = try? JSONDecoder().decode([WeeklyRetrospective].self, from: data) {
+            weeklyRetrospectives = decoded
+        }
+    }
+    
     init() {
         loadRevisions()
+        loadWeeklyRetrospectives()
     }
 }
 
@@ -722,19 +1147,29 @@ class SettingsStore: ObservableObject {
         }
     }
     
+    @Published var waterUnit: WaterUnit {
+        didSet {
+            UserDefaults.standard.set(waterUnit.rawValue, forKey: "waterUnitPreference")
+        }
+    }
     enum WaterUnit: String, CaseIterable {
-        case liters = "Liters"
-        case ounces = "Ounces"
+        case liters = "L"
+        case ounces = "oz"
         
-        var suffix: String {
+        var conversionFactor: Double {
             switch self {
-            case .liters: return "L"
-            case .ounces: return "oz"
+            case .liters: return 1.0
+            case .ounces: return 33.814
             }
         }
     }
     
     init() {
+        // First load the water unit preference
+        let savedUnit = UserDefaults.standard.string(forKey: "waterUnitPreference")
+        self.waterUnit = WaterUnit(rawValue: savedUnit ?? "L") ?? .liters
+        
+        // Then load other settings
         loadSettings()
     }
     
@@ -770,6 +1205,7 @@ struct ContentView: View {
         case status
         case revision
         case goals
+        case history
         case settings
         
         var id: String { self.rawValue }
@@ -782,6 +1218,7 @@ struct ContentView: View {
             case .status: return "Status"
             case .revision: return "Daily Revision"
             case .goals: return "My Goals"
+            case .history: return "History"
             case .settings: return "Settings"
             }
         }
@@ -794,6 +1231,7 @@ struct ContentView: View {
             case .status: return "chart.line.uptrend.xyaxis"
             case .revision: return "arrow.clockwise"
             case .goals: return "target"
+            case .history: return "book.fill"
             case .settings: return "gearshape.fill"
             }
         }
@@ -817,6 +1255,8 @@ struct ContentView: View {
                         RevisionView()
                     case .goals:
                         GoalsView()
+                    case .history:
+                        HistoryView()
                     case .settings:
                         SettingsView()
                     }
@@ -836,8 +1276,7 @@ struct ContentView: View {
                     
                     SideMenuView(
                         selectedTab: $selectedTab,
-                        isMenuOpen: $isMenuOpen,
-                        settingsStore: settingsStore
+                        isMenuOpen: $isMenuOpen
                     )
                     .transition(.move(edge: .leading))
                     .gesture(
@@ -881,21 +1320,18 @@ struct ContentView: View {
     }
 }
 
-// Side Menu View
 struct SideMenuView: View {
     @EnvironmentObject var settings: SettingsStore
     @Binding var selectedTab: ContentView.Tab
     @Binding var isMenuOpen: Bool
-    @ObservedObject var settingsStore: SettingsStore
     
     var body: some View {
         ZStack {
             settings.currentTheme.backgroundColor
                 .edgesIgnoringSafeArea(.all)
             
-            // Make the content scrollable
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 0) {
                     // App title/header
                     VStack(alignment: .leading) {
                         Text("Empisa Empire")
@@ -908,55 +1344,538 @@ struct SideMenuView: View {
                     }
                     .padding(.top, 50)
                     .padding(.bottom, 30)
+                    .padding(.horizontal, 20)
                     
-                    // Menu items - now scrollable if they don't fit
-                    ForEach(ContentView.Tab.allCases) { tab in
-                        Button(action: {
-                            selectedTab = tab
-                            withAnimation {
-                                isMenuOpen = false
-                            }
-                        }) {
-                            HStack {
-                                Image(systemName: tab.icon)
-                                    .foregroundColor(selectedTab == tab ? settings.currentTheme.accentColor : settings.currentTheme.textColor)
-                                    .frame(width: 30)
-                                Text(tab.title)
-                                    .foregroundColor(selectedTab == tab ? settings.currentTheme.accentColor : settings.currentTheme.textColor)
-                                Spacer()
-                            }
-                            .padding(.vertical, 12)
-                            .padding(.horizontal, 20)
-                            .background(selectedTab == tab ? settings.currentTheme.accentColor.opacity(0.2) : Color.clear)
-                            .cornerRadius(10)
-                        }
+                    // Past / History / Body Section
+                    SectionHeader(title: "Past / History / Body")
+                    
+                    Text("History Coming Soon")
+                        .font(.subheadline)
+                        .foregroundColor(settings.currentTheme.textColor.opacity(0.7))
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 20)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    Divider()
+                        .background(settings.currentTheme.textColor.opacity(0.2))
+                        .padding(.vertical, 8)
+                    
+                    // Present / Philosophy / Mind Section
+                    SectionHeader(title: "Present / Philosophy / Mind")
+                    
+                    ForEach(ContentView.Tab.allCases.filter { tab in
+                        tab != .settings && tab != .goals
+                    }) { tab in
+                        MenuItemButton(tab: tab, selectedTab: $selectedTab, isMenuOpen: $isMenuOpen)
                     }
+                    
+                    // Goals (special case)
+                    MenuItemButton(tab: .goals, selectedTab: $selectedTab, isMenuOpen: $isMenuOpen)
+                    
+                    Divider()
+                        .background(settings.currentTheme.textColor.opacity(0.2))
+                        .padding(.vertical, 8)
+                    
+                    // Future / Ethics / Spirit Section
+                    SectionHeader(title: "Future / Ethics / Spirit")
+                    
+                    Text("Ethics Coming Soon")
+                        .font(.subheadline)
+                        .foregroundColor(settings.currentTheme.textColor.opacity(0.7))
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 20)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     
                     Spacer()
                     
-                    // Theme selector
-                    VStack(alignment: .leading) {
-                        Text("THEME")
-                            .font(.caption)
-                            .foregroundColor(settings.currentTheme.textColor.opacity(0.5))
-                            .padding(.horizontal, 20)
-                        
-                        Picker("Theme", selection: $settingsStore.currentTheme) {
-                            ForEach(AppTheme.allCases) { theme in
-                                Text(theme.rawValue.capitalized)
-                                    .tag(theme)
-                            }
-                        }
-                        .pickerStyle(SegmentedPickerStyle())
-                        .padding(.horizontal)
-                        .colorMultiply(settings.currentTheme.primaryColor)
-                    }
-                    .padding(.bottom, 30)
+                    // Settings at the bottom
+                    MenuItemButton(tab: .settings, selectedTab: $selectedTab, isMenuOpen: $isMenuOpen)
+                        .padding(.bottom, 30)
                 }
                 .padding(.leading, 20)
                 .frame(width: UIScreen.main.bounds.width * 0.7)
             }
             .background(settings.currentTheme.backgroundColor)
+        }
+    }
+}
+
+struct SectionHeader: View {
+    @EnvironmentObject var settings: SettingsStore
+    let title: String
+    
+    var body: some View {
+        Text(title)
+            .font(.caption)
+            .foregroundColor(settings.currentTheme.textColor.opacity(0.5))
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 8)
+    }
+}
+
+struct MenuItemButton: View {
+    @EnvironmentObject var settings: SettingsStore
+    let tab: ContentView.Tab
+    @Binding var selectedTab: ContentView.Tab
+    @Binding var isMenuOpen: Bool
+    
+    var body: some View {
+        Button(action: {
+            selectedTab = tab
+            withAnimation {
+                isMenuOpen = false
+            }
+        }) {
+            HStack {
+                Image(systemName: tab.icon)
+                    .foregroundColor(selectedTab == tab ? settings.currentTheme.accentColor : settings.currentTheme.textColor)
+                    .frame(width: 30)
+                Text(tab.title)
+                    .foregroundColor(selectedTab == tab ? settings.currentTheme.accentColor : settings.currentTheme.textColor)
+                Spacer()
+            }
+            .padding(.vertical, 12)
+            .padding(.horizontal, 20)
+            .background(selectedTab == tab ? settings.currentTheme.accentColor.opacity(0.2) : Color.clear)
+            .cornerRadius(10)
+        }
+    }
+}
+
+// Reusable Menu Button View
+struct MenuButton: View {
+    @EnvironmentObject var settings: SettingsStore
+    let tab: ContentView.Tab
+    @Binding var selectedTab: ContentView.Tab
+    @Binding var isMenuOpen: Bool
+    
+    var body: some View {
+        Button(action: {
+            selectedTab = tab
+            withAnimation {
+                isMenuOpen = false
+            }
+        }) {
+            HStack {
+                Image(systemName: tab.icon)
+                    .foregroundColor(selectedTab == tab ? settings.currentTheme.accentColor : settings.currentTheme.textColor)
+                    .frame(width: 30)
+                Text(tab.title)
+                    .foregroundColor(selectedTab == tab ? settings.currentTheme.accentColor : settings.currentTheme.textColor)
+                Spacer()
+            }
+            .padding(.vertical, 12)
+            .padding(.horizontal, 20)
+            .background(selectedTab == tab ? settings.currentTheme.accentColor.opacity(0.2) : Color.clear)
+            .cornerRadius(10)
+        }
+    }
+}
+// MARK: History View
+struct HistoryView: View {
+    @EnvironmentObject var settings: SettingsStore
+    @StateObject private var historyStore = HistoryStore()
+    @State private var showingCourseDetail = false
+    @State private var selectedCourse: HistoryCourse?
+    @State private var showingReflectionSheet = false
+    @State private var reflectionAnswer = ""
+    @State private var reflectionNotes = ""
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Current Course Progress
+                    if let currentCourse = historyStore.courses.first(where: { $0.isEnrolled }) {
+                        currentCourseView(course: currentCourse)
+                    }
+                    
+                    // Available Courses
+                    availableCoursesSection
+                }
+                .padding()
+            }
+            .navigationTitle("History Learning")
+            .sheet(isPresented: $showingCourseDetail) {
+                if let course = selectedCourse {
+                    CourseDetailView(historyStore: historyStore, course: course)
+                        .environmentObject(settings)
+                }
+            }
+            .sheet(isPresented: $showingReflectionSheet) {
+                if let currentCourse = historyStore.courses.first(where: { $0.isEnrolled }) {
+                    ReflectionView(
+                        question: currentCourse.days.first { $0.dayNumber == currentCourse.currentDay }?.reflectionQuestion ?? "",
+                        answer: $reflectionAnswer,
+                        notes: $reflectionNotes,
+                        onSubmit: {
+                            historyStore.completeCurrentDay(
+                                courseId: currentCourse.id,
+                                reflectionAnswer: reflectionAnswer,
+                                notes: reflectionNotes
+                            )
+                            reflectionAnswer = ""
+                            reflectionNotes = ""
+                            showingReflectionSheet = false
+                        }
+                    )
+                    .environmentObject(settings)
+                }
+            }
+        }
+    }
+    
+    private func currentCourseView(course: HistoryCourse) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Current Course")
+                    .font(.title2.bold())
+                    .foregroundColor(settings.currentTheme.textColor)
+                Spacer()
+                Text("Day \(course.currentDay) of \(course.durationInDays)")
+                    .font(.subheadline)
+                    .foregroundColor(settings.currentTheme.textColor.opacity(0.7))
+            }
+            
+            Text(course.title)
+                .font(.headline)
+                .foregroundColor(settings.currentTheme.textColor)
+            
+            ProgressView(value: Double(course.currentDay), total: Double(course.durationInDays))
+                .tint(settings.currentTheme.accentColor)
+            
+            if let dayContent = historyStore.getCurrentDayContent(courseId: course.id) {
+                NavigationLink {
+                    DayContentView(
+                        historyStore: historyStore, day: dayContent,
+                        onComplete: {
+                            showingReflectionSheet = true
+                        }
+                    )
+                    .environmentObject(settings)
+                } label: {
+                    Text("Continue to Day \(dayContent.dayNumber): \(dayContent.title)")
+                        .font(.subheadline.bold())
+                        .foregroundColor(.white)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(settings.currentTheme.accentColor)
+                        .cornerRadius(10)
+                }
+            }
+        }
+        .padding()
+        .background(settings.currentTheme.backgroundColor.opacity(0.2))
+        .cornerRadius(12)
+    }
+    
+    private var availableCoursesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Available Courses")
+                .font(.title2.bold())
+                .foregroundColor(settings.currentTheme.textColor)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            
+            ForEach(historyStore.courses.filter { !$0.isEnrolled }) { course in
+                CourseCard(course: course)
+                    .onTapGesture {
+                        selectedCourse = course
+                        showingCourseDetail = true
+                    }
+            }
+        }
+    }
+}
+
+struct CourseCard: View {
+    @EnvironmentObject var settings: SettingsStore
+    let course: HistoryCourse
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: "book.fill")
+                    .foregroundColor(settings.currentTheme.accentColor)
+                Text(course.title)
+                    .font(.headline)
+                    .foregroundColor(settings.currentTheme.textColor)
+                Spacer()
+                Text("\(course.durationInDays) days")
+                    .font(.caption)
+                    .foregroundColor(settings.currentTheme.textColor.opacity(0.7))
+            }
+            
+            Text(course.description)
+                .font(.subheadline)
+                .foregroundColor(settings.currentTheme.textColor.opacity(0.8))
+                .lineLimit(2)
+            
+            HStack {
+                Spacer()
+                Text("Tap to learn more")
+                    .font(.caption)
+                    .foregroundColor(settings.currentTheme.accentColor)
+            }
+        }
+        .padding()
+        .background(settings.currentTheme.backgroundColor.opacity(0.1))
+        .cornerRadius(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(settings.currentTheme.backgroundColor.opacity(0.3), lineWidth: 1)
+        )
+    }
+}
+
+struct CourseDetailView: View {
+    @EnvironmentObject var settings: SettingsStore
+    @ObservedObject var historyStore: HistoryStore
+    let course: HistoryCourse
+    @Environment(\.presentationMode) var presentationMode
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text(course.title)
+                        .font(.title.bold())
+                        .foregroundColor(settings.currentTheme.textColor)
+                    
+                    Text(course.description)
+                        .font(.body)
+                        .foregroundColor(settings.currentTheme.textColor)
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Course Details")
+                            .font(.headline)
+                            .foregroundColor(settings.currentTheme.textColor)
+                        
+                        DetailRow(icon: "calendar", text: "\(course.durationInDays) days")
+                        DetailRow(icon: "book", text: "Daily essays and readings")
+                        DetailRow(icon: "questionmark.circle", text: "Reflection questions")
+                        DetailRow(icon: "checkmark.circle", text: "Track your progress")
+                    }
+                    .padding()
+                    .background(settings.currentTheme.backgroundColor.opacity(0.1))
+                    .cornerRadius(10)
+                    
+                    if !course.isEnrolled {
+                        Button(action: {
+                            historyStore.enrollInCourse(courseId: course.id)
+                            presentationMode.wrappedValue.dismiss()
+                        }) {
+                            Text("Enroll in Course")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                                .background(settings.currentTheme.accentColor)
+                                .cornerRadius(10)
+                        }
+                    }
+                }
+                .padding()
+            }
+            .navigationBarTitle("Course Details", displayMode: .inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Close") {
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                    .foregroundColor(settings.currentTheme.accentColor)
+                }
+            }
+        }
+    }
+}
+
+struct DetailRow: View {
+    @EnvironmentObject var settings: SettingsStore
+    let icon: String
+    let text: String
+    
+    var body: some View {
+        HStack {
+            Image(systemName: icon)
+                .foregroundColor(settings.currentTheme.accentColor)
+                .frame(width: 30)
+            Text(text)
+                .foregroundColor(settings.currentTheme.textColor)
+            Spacer()
+        }
+    }
+}
+
+struct DayContentView: View {
+    @EnvironmentObject var settings: SettingsStore
+    @ObservedObject var historyStore: HistoryStore
+    let day: HistoryDay
+    let onComplete: () -> Void
+    
+    @State private var isSpeaking = false
+    
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                HStack {
+                    Text("Day \(day.dayNumber)")
+                        .font(.title.bold())
+                        .foregroundColor(settings.currentTheme.textColor)
+                    Spacer()
+                    
+                    Button(action: toggleSpeech) {
+                        Image(systemName: isSpeaking ? "stop.fill" : "speaker.wave.2.fill")
+                            .foregroundColor(settings.currentTheme.accentColor)
+                    }
+                }
+                
+                Text(day.title)
+                    .font(.title2)
+                    .foregroundColor(settings.currentTheme.textColor)
+                
+                Divider()
+                
+                Text("Today's Essay")
+                    .font(.headline)
+                    .foregroundColor(settings.currentTheme.textColor)
+                
+                Text(day.essay)
+                    .font(.body)
+                    .foregroundColor(settings.currentTheme.textColor)
+                
+                Divider()
+                
+                Text("Key Points")
+                    .font(.headline)
+                    .foregroundColor(settings.currentTheme.textColor)
+                
+                ForEach(day.keyPoints, id: \.self) { point in
+                    HStack(alignment: .top) {
+                        Image(systemName: "circle.fill")
+                            .font(.system(size: 8))
+                            .foregroundColor(settings.currentTheme.accentColor)
+                            .padding(.top, 6)
+                        Text(point)
+                            .font(.body)
+                            .foregroundColor(settings.currentTheme.textColor)
+                    }
+                }
+                
+                if let reading = day.recommendedReading {
+                    Divider()
+                    
+                    Text("Recommended Reading")
+                        .font(.headline)
+                        .foregroundColor(settings.currentTheme.textColor)
+                    
+                    Text(reading)
+                        .font(.body)
+                        .foregroundColor(settings.currentTheme.textColor)
+                }
+                
+                if let videoURL = day.videoURL, let url = URL(string: videoURL) {
+                    Divider()
+                    
+                    Text("Supplementary Video")
+                        .font(.headline)
+                        .foregroundColor(settings.currentTheme.textColor)
+                    
+                    Link(destination: url) {
+                        HStack {
+                            Image(systemName: "play.fill")
+                            Text("Watch Video")
+                        }
+                        .foregroundColor(.white)
+                        .padding()
+                        .background(Color.red)
+                        .cornerRadius(8)
+                    }
+                }
+                
+                Button(action: onComplete) {
+                    Text("Complete Day")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(settings.currentTheme.accentColor)
+                        .cornerRadius(10)
+                }
+                .padding(.top, 20)
+            }
+            .padding()
+        }
+        .navigationBarTitle("Day \(day.dayNumber)", displayMode: .inline)
+        .onAppear {
+            historyStore.stopSpeaking()
+            isSpeaking = false
+        }
+        .onDisappear {
+            historyStore.stopSpeaking()
+        }
+    }
+    
+    private func toggleSpeech() {
+        if isSpeaking {
+            historyStore.stopSpeaking()
+        } else {
+            historyStore.speak(text: "\(day.title). \(day.essay)")
+        }
+        isSpeaking.toggle()
+    }
+}
+
+struct ReflectionView: View {
+    @EnvironmentObject var settings: SettingsStore
+    let question: String
+    @Binding var answer: String
+    @Binding var notes: String
+    let onSubmit: () -> Void
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("Reflection Question").foregroundColor(settings.currentTheme.accentColor)) {
+                    Text(question)
+                        .font(.headline)
+                        .foregroundColor(settings.currentTheme.textColor)
+                    
+                    TextField("Your answer", text: $answer)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                }
+                
+                Section(header: Text("Additional Notes").foregroundColor(settings.currentTheme.accentColor)) {
+                    TextEditor(text: $notes)
+                        .frame(minHeight: 100)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(settings.currentTheme.backgroundColor.opacity(0.3), lineWidth: 1)
+                        )
+                }
+                
+                Section {
+                    Button(action: onSubmit) {
+                        HStack {
+                            Spacer()
+                            Text("Submit Reflection")
+                                .fontWeight(.bold)
+                            Spacer()
+                        }
+                    }
+                    .disabled(answer.isEmpty)
+                    .tint(settings.currentTheme.accentColor)
+                }
+            }
+            .navigationTitle("Daily Reflection")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        onSubmit() // Still submit but with empty values if user cancels
+                    }
+                }
+            }
         }
     }
 }
@@ -1556,7 +2475,7 @@ struct EditTaskView: View {
         _editedRecurrenceDays = State(initialValue: task.recurrenceDays)
         
         // Initialize date and time components
-        let calendar = Calendar.current
+        _ = Calendar.current
         _startDate = State(initialValue: task.startDate)
         _startTime = State(initialValue: task.startDate)
         _endTime = State(initialValue: task.endDate)
@@ -2633,6 +3552,7 @@ struct HealthView: View {
     @EnvironmentObject var settings: SettingsStore
     @ObservedObject var healthStore: HealthStore
     @State private var showingAddHealth = false
+    @State private var showingUnitSettings = false
     
     // States for individual metric editing
     @State private var showingEditWater = false
@@ -2642,6 +3562,34 @@ struct HealthView: View {
     @State private var tempSleepValue = ""
     @State private var tempCaloriesValue = ""
     
+    private var todaysRecord: HealthRecord {
+        healthStore.todaysRecord()
+    }
+    
+    private var weeklyAverages: (water: Double, sleep: Double, calories: Int) {
+        healthStore.weeklyAverage()
+    }
+    
+    // Computed properties for water display
+    private var waterDisplayValue: String {
+        String(format: "%.1f %@", todaysRecord.waterIntake.converted(to: settings.waterUnit), settings.waterUnit.rawValue)
+    }
+    
+    private var waterDisplayGoal: String {
+        let baseGoal = 2.5 // 2.5 liters is the base goal
+        let convertedGoal = baseGoal * settings.waterUnit.conversionFactor
+        return String(format: "%.1f %@", convertedGoal, settings.waterUnit.rawValue)
+    }
+    
+    private var waterProgress: Double {
+        let baseGoal = 2.5
+        return todaysRecord.waterIntake / baseGoal
+    }
+    
+    private var avgWaterDisplayValue: String {
+        String(format: "%.1f %@", weeklyAverages.water.converted(to: settings.waterUnit), settings.waterUnit.rawValue)
+    }
+        
     var body: some View {
         NavigationView {
             ZStack {
@@ -2652,37 +3600,38 @@ struct HealthView: View {
                     VStack(spacing: 20) {
                         // Today's Summary
                         VStack(spacing: 16) {
-                            Text("Today's Health")
-                                .font(.title2.bold())
-                                .foregroundColor(settings.currentTheme.textColor)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal)
+                            HStack {
+                                Text("Today's Health")
+                                    .font(.title2.bold())
+                                    .foregroundColor(settings.currentTheme.textColor)
+                                
+                                Spacer()
+                                
+                                Button(action: { showingUnitSettings = true }) {
+                                    Image(systemName: "gear")
+                                        .foregroundColor(settings.currentTheme.accentColor)
+                                }
+                            }
+                            .padding(.horizontal)
                             
                             HStack(spacing: 16) {
                                 HealthMetricCard(
                                     title: "Water",
-                                    value: String(format: "%.1f L", healthStore.todaysRecord().waterIntake),
-                                    goal: "2.5 L",
-                                    progress: healthStore.todaysRecord().waterIntake / 2.5,
+                                    value: waterDisplayValue,
+                                    goal: waterDisplayGoal,
+                                    progress: waterProgress,
                                     color: .blue
                                 )
-                                .healthMetricCardEditModifier(
-                                    isPresented: $showingEditWater,
-                                    title: "Water Intake",
-                                    value: $tempWaterValue,
-                                    healthStore: healthStore
-                                )
-                                .onAppear {
-                                    tempWaterValue = String(format: "%.1f", healthStore.todaysRecord().waterIntake)
-                                }
                                 
                                 HealthMetricCard(
                                     title: "Sleep",
-                                    value: String(format: "%.1f hrs", healthStore.todaysRecord().sleepHours),
+                                    value: String(format: "%.1f hrs", todaysRecord.sleepHours),
                                     goal: "8 hrs",
-                                    progress: healthStore.todaysRecord().sleepHours / 8,
+                                    progress: todaysRecord.sleepHours / 8,
                                     color: .purple
                                 )
+                            }
+                            .padding(.horizontal)
                                 .healthMetricCardEditModifier(
                                     isPresented: $showingEditSleep,
                                     title: "Sleep Hours",
@@ -2715,21 +3664,21 @@ struct HealthView: View {
                         }
                         
                         // Weekly Averages
-                        VStack(spacing: 16) {
-                            Text("Weekly Averages")
-                                .font(.title2.bold())
-                                .foregroundColor(settings.currentTheme.textColor)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal)
+                    VStack(spacing: 16) {
+                        Text("Weekly Averages")
+                            .font(.title2.bold())
+                            .foregroundColor(settings.currentTheme.textColor)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal)
                             
                             let averages = healthStore.weeklyAverage()
                             
                             HStack(spacing: 16) {
                                 HealthMetricCard(
                                     title: "Avg Water",
-                                    value: String(format: "%.1f L", averages.water),
-                                    goal: "2.5 L",
-                                    progress: averages.water / 2.5,
+                                    value: avgWaterDisplayValue,
+                                    goal: waterDisplayGoal,
+                                    progress: weeklyAverages.water / 2.5,
                                     color: .blue
                                 )
                                 
@@ -2771,6 +3720,7 @@ struct HealthView: View {
                                     .padding(.horizontal)
                                     .shadow(color: settings.currentTheme.textColor.opacity(0.1), radius: 2, x: 0, y: 1)
                             }
+                            .padding(.horizontal)
                         }
                     }
                     .padding(.vertical)
@@ -2778,9 +3728,7 @@ struct HealthView: View {
                 .navigationTitle("Health Tracker")
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        Button(action: {
-                            showingAddHealth = true
-                        }) {
+                        Button(action: { showingAddHealth = true }) {
                             Image(systemName: "plus")
                                 .foregroundColor(settings.currentTheme.accentColor)
                         }
@@ -2788,6 +3736,37 @@ struct HealthView: View {
                 }
                 .sheet(isPresented: $showingAddHealth) {
                     AddHealthView(healthStore: healthStore)
+                }
+                .sheet(isPresented: $showingUnitSettings) {
+                    WaterUnitSettingsView()
+                }
+            }
+        }
+    }
+
+
+struct WaterUnitSettingsView: View {
+    @EnvironmentObject var settings: SettingsStore
+    @Environment(\.presentationMode) var presentationMode
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("Water Measurement Unit")) {
+                    Picker("Unit", selection: $settings.waterUnit) {
+                        ForEach(SettingsStore.WaterUnit.allCases, id: \.self) { unit in
+                            Text(unit.rawValue).tag(unit)
+                        }
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+                }
+            }
+            .navigationTitle("Units")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        presentationMode.wrappedValue.dismiss()
+                    }
                 }
             }
         }
@@ -2950,6 +3929,12 @@ struct HealthRecordRow: View {
     @EnvironmentObject var settings: SettingsStore
     let record: HealthRecord
     
+    private var waterDisplayValue: String {
+        String(format: "%.1f %@",
+              record.waterIntake.converted(to: settings.waterUnit),
+              settings.waterUnit.rawValue)
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(record.date, format: .dateTime.day().month().year())
@@ -2958,16 +3943,20 @@ struct HealthRecordRow: View {
             
             HStack {
                 HealthMetricPill(
-                    value: String(format: "%.1f L", record.waterIntake),
+                    value: waterDisplayValue,
                     label: "Water",
                     color: .blue
                 )
                 HealthMetricPill(
-                                    value: String(format: "%.1f hrs", record.sleepHours),
-                                    label: "Sleep",
-                                    color: .purple
-                                )
-                HealthMetricPill(value: "\(record.caloriesConsumed)", label: "Calories", color: .orange)
+                    value: String(format: "%.1f hrs", record.sleepHours),
+                    label: "Sleep",
+                    color: .purple
+                )
+                HealthMetricPill(
+                    value: "\(record.caloriesConsumed)",
+                    label: "Calories",
+                    color: .orange
+                )
             }
         }
     }
@@ -3017,10 +4006,9 @@ struct AddHealthView: View {
                         HStack {
                             Image(systemName: "drop.fill")
                                 .foregroundColor(.blue)
-                            TextField("Water (L)", text: $waterIntake)
+                            TextField("Water (\(settings.waterUnit.rawValue))", text: $waterIntake)
                                 .keyboardType(.decimalPad)
                         }
-                        
                         HStack {
                             Image(systemName: "moon.zzz.fill")
                                 .foregroundColor(.purple)
@@ -3084,11 +4072,13 @@ struct AddHealthView: View {
     }
 }
 
-//MARK: - Status View
+//MARK: Status View
 struct StatusView: View {
     @EnvironmentObject var settings: SettingsStore
     @StateObject private var statusStore = StatusStore()
-    @State private var showingAddStatus = false
+    @State private var showingPlatformSheet = false
+    @State private var newPlatformName = ""
+    @State private var newPlatformIcon = "questionmark"
     
     var body: some View {
         NavigationView {
@@ -3098,156 +4088,1019 @@ struct StatusView: View {
                 
                 ScrollView {
                     VStack(spacing: 20) {
-                        // Growth Summary
-                        let growth = statusStore.weeklyGrowth()
+                        // Today's Summary
+                        todaySummarySection
                         
-                        HStack(spacing: 16) {
-                            StatusMetricCard(
-                                title: "New Followers",
-                                value: "\(growth.followers)",
-                                trend: growth.followers >= 0 ? "up" : "down",
-                                color: .green
-                            )
-                            
-                            StatusMetricCard(
-                                title: "Content Posted",
-                                value: "\(growth.posts)",
-                                trend: growth.posts >= 0 ? "up" : "down",
-                                color: .blue
-                            )
-                        }
-                        .padding(.horizontal)
+                        // Platform Metrics
+                        platformMetricsSection
                         
-                        HStack(spacing: 16) {
-                            StatusMetricCard(
-                                title: "Engagement",
-                                value: String(format: "%.1f%%", growth.engagement),
-                                trend: growth.engagement >= 0 ? "up" : "down",
-                                color: .purple
-                            )
-                            
-                            StatusMetricCard(
-                                title: "Time Invested",
-                                value: "\(growth.minutes) min",
-                                trend: "none",
-                                color: .orange
-                            )
-                        }
-                        .padding(.horizontal)
-                        
-                        // Recent Records
-                        VStack(alignment: .leading) {
-                            Text("Recent Updates")
-                                .font(.title2.bold())
-                                .foregroundColor(settings.currentTheme.textColor)
-                                .padding(.horizontal)
-                            
-                            ForEach(statusStore.records.sorted(by: { $0.date > $1.date }).prefix(3)) { record in
-                                StatusRecordRow(record: record)
-                                    .padding(.horizontal)
+                        // Add Platform Button
+                        if statusStore.platforms.count < 5 {
+                            Button(action: { showingPlatformSheet = true }) {
+                                HStack {
+                                    Image(systemName: "plus")
+                                    Text("Add Platform")
+                                }
+                                .foregroundColor(settings.currentTheme.accentColor)
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                                .background(settings.currentTheme.backgroundColor.opacity(0.2))
+                                .cornerRadius(10)
                             }
+                            .padding(.horizontal)
                         }
                     }
                     .padding(.vertical)
                 }
-                .navigationTitle("Social Growth")
+                .navigationTitle("Social Status")
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        Button(action: { showingAddStatus = true }) {
-                            Image(systemName: "plus")
+                        Button(action: {
+                            // Refresh action if needed
+                        }) {
+                            Image(systemName: "arrow.clockwise")
                                 .foregroundColor(settings.currentTheme.accentColor)
                         }
                     }
                 }
-                .sheet(isPresented: $showingAddStatus) {
-                    AddStatusView(statusStore: statusStore)
+                .sheet(isPresented: $showingPlatformSheet) {
+                    addPlatformSheet
                 }
             }
         }
+    }
+    
+    private var todaySummarySection: some View {
+        let todayMetrics = statusStore.getTodayMetrics()
+        
+        return VStack(spacing: 16) {
+            Text("Today's Activity")
+                .font(.title2.bold())
+                .foregroundColor(settings.currentTheme.textColor)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal)
+            
+            HStack(spacing: 16) {
+                StatusMetricCard(
+                    title: "Posts",
+                    value: todayMetrics.posts.values.reduce(0, +),
+                    icon: "square.and.pencil",
+                    color: .blue
+                )
+                
+                StatusMetricCard(
+                    title: "Comments",
+                    value: todayMetrics.comments.values.reduce(0, +),
+                    icon: "text.bubble",
+                    color: .green
+                )
+            }
+            .padding(.horizontal)
+            
+            HStack(spacing: 16) {
+                StatusMetricCard(
+                    title: "Minutes",
+                    value: todayMetrics.minutes.values.reduce(0, +),
+                    icon: "clock",
+                    color: .orange
+                )
+                
+                StatusMetricCard(
+                    title: "Platforms",
+                    value: statusStore.platforms.count,
+                    icon: "apps.iphone",
+                    color: .purple
+                )
+            }
+            .padding(.horizontal)
+        }
+    }
+    
+    private var platformMetricsSection: some View {
+        VStack(spacing: 16) {
+            Text("Platform Breakdown")
+                .font(.title2.bold())
+                .foregroundColor(settings.currentTheme.textColor)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal)
+            
+            ForEach(statusStore.platforms) { platform in
+                PlatformCard(platform: platform, statusStore: statusStore)
+                    .padding(.horizontal)
+            }
+        }
+    }
+    
+    private var addPlatformSheet: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("Platform Details").foregroundColor(settings.currentTheme.accentColor)) {
+                    TextField("Platform Name", text: $newPlatformName)
+                    
+                    Picker("Icon", selection: $newPlatformIcon) {
+                        Image(systemName: "camera").tag("camera")
+                        Image(systemName: "bird").tag("bird")
+                        Image(systemName: "music.note").tag("music.note")
+                        Image(systemName: "play.rectangle").tag("play.rectangle")
+                        Image(systemName: "briefcase").tag("briefcase")
+                        Image(systemName: "questionmark").tag("questionmark")
+                    }
+                    .pickerStyle(.segmented)
+                }
+                
+                Section {
+                    Button("Add Platform") {
+                        statusStore.addPlatform(name: newPlatformName, icon: newPlatformIcon)
+                        showingPlatformSheet = false
+                        newPlatformName = ""
+                        newPlatformIcon = "questionmark"
+                    }
+                    .disabled(newPlatformName.isEmpty)
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            .navigationTitle("Add Platform")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Cancel") {
+                        showingPlatformSheet = false
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct PlatformCard: View {
+    @EnvironmentObject var settings: SettingsStore
+    let platform: Platform
+    @ObservedObject var statusStore: StatusStore
+    
+    var body: some View {
+        let todayMetrics = statusStore.getTodayMetrics()
+        
+        return VStack(spacing: 12) {
+            HStack {
+                Image(systemName: platform.icon)
+                    .font(.title)
+                    .foregroundColor(settings.currentTheme.accentColor)
+                
+                Text(platform.name)
+                    .font(.headline)
+                    .foregroundColor(settings.currentTheme.textColor)
+                
+                Spacer()
+            }
+            
+            HStack(spacing: 16) {
+                StatusMetricPill(
+                    value: "\(todayMetrics.count(for: .post, platformId: platform.id))",
+                    label: "Posts",
+                    color: .blue,
+                    action: {
+                        statusStore.incrementMetric(for: platform.id, metric: .post)
+                    }
+                )
+                
+                StatusMetricPill(
+                    value: "\(todayMetrics.count(for: .comment, platformId: platform.id))",
+                    label: "Comments",
+                    color: .green,
+                    action: {
+                        statusStore.incrementMetric(for: platform.id, metric: .comment)
+                    }
+                )
+                
+                StatusMetricPill(
+                    value: "\(todayMetrics.count(for: .minute, platformId: platform.id))",
+                    label: "Minutes",
+                    color: .orange,
+                    action: {
+                        statusStore.incrementMetric(for: platform.id, metric: .minute)
+                    }
+                )
+            }
+        }
+        .padding()
+        .background(settings.currentTheme.backgroundColor.opacity(0.2))
+        .cornerRadius(10)
     }
 }
 
 struct StatusMetricCard: View {
     @EnvironmentObject var settings: SettingsStore
     let title: String
-    let value: String
-    let trend: String // "up", "down", or "none"
+    let value: Int
+    let icon: String
     let color: Color
     
-    var trendIcon: String {
-        switch trend {
-        case "up": return "arrow.up"
-        case "down": return "arrow.down"
-        default: return "minus"
+    var body: some View {
+        VStack(spacing: 8) {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundColor(color)
+                Spacer()
+                Text("\(value)")
+                    .font(.title2.bold())
+                    .foregroundColor(settings.currentTheme.textColor)
+            }
+            
+            Text(title)
+                .font(.subheadline)
+                .foregroundColor(settings.currentTheme.textColor.opacity(0.7))
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .padding()
+        .frame(maxWidth: .infinity)
+        .background(settings.currentTheme.backgroundColor.opacity(0.2))
+        .cornerRadius(10)
     }
-    
-    var trendColor: Color {
-        switch trend {
-        case "up": return .green
-        case "down": return .red
-        default: return settings.currentTheme.textColor.opacity(0.7)
-        }
-    }
+}
+
+struct StatusMetricPill: View {
+    @EnvironmentObject var settings: SettingsStore
+    let value: String
+    let label: String
+    let color: Color
+    let action: () -> Void
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(title)
-                    .font(.subheadline)
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Text(value)
+                    .font(.subheadline.bold())
                     .foregroundColor(settings.currentTheme.textColor)
+                Text(label)
+                    .font(.caption2)
+                    .foregroundColor(settings.currentTheme.textColor.opacity(0.7))
+            }
+            .padding(8)
+            .frame(minWidth: 60)
+            .background(color.opacity(0.2))
+            .cornerRadius(20)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+//MARK: - Revision View
+struct RevisionView: View {
+    @EnvironmentObject var settings: SettingsStore
+    @StateObject private var revisionStore = RevisionStore()
+    @State private var showingAddRevision = false
+    @State private var showingWeeklyRetrospective = false
+    @State private var selectedWeek: Date = Date()
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Today's Summary Card
+                    todaysSummaryCard
+                    
+                    // Weekly Retrospective Section
+                    weeklyRetrospectiveSection
+                    
+                    // Recent Revisions
+                    recentRevisionsSection
+                }
+                .padding(.vertical)
+            }
+            .navigationTitle("Daily Revision")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: { showingAddRevision = true }) {
+                        Image(systemName: "plus")
+                            .foregroundColor(settings.currentTheme.accentColor)
+                    }
+                }
+            }
+            .sheet(isPresented: $showingAddRevision) {
+                AddRevisionView(revisionStore: revisionStore)
+            }
+            .sheet(isPresented: $showingWeeklyRetrospective) {
+                WeeklyRetrospectiveView(
+                    retrospective: getCurrentWeeklyRetrospective(),
+                    revisionStore: revisionStore
+                )
+            }
+        }
+    }
+    
+    private var todaysSummaryCard: some View {
+        let todaysRevision = revisionStore.getTodaysRevision()
+        let moodColor = moodToColor(todaysRevision.mood)
+        
+        return VStack(spacing: 16) {
+            HStack {
+                Text("Today's Review")
+                    .font(.title2.bold())
+                    .foregroundColor(settings.currentTheme.textColor)
+                
                 Spacer()
                 
-                if trend != "none" {
-                    Image(systemName: trendIcon)
-                        .foregroundColor(trendColor)
+                // Mood indicator
+                Text(todaysRevision.mood.rawValue)
+                    .font(.title)
+                    .padding(8)
+                    .background(moodColor.opacity(0.2))
+                    .clipShape(Circle())
+            }
+            .padding(.horizontal)
+            
+            // Energy level
+            HStack {
+                Text("Energy:")
+                    .foregroundColor(settings.currentTheme.textColor)
+                
+                ForEach(1...5, id: \.self) { level in
+                    Image(systemName: level <= todaysRevision.energyLevel ? "bolt.fill" : "bolt")
+                        .foregroundColor(level <= todaysRevision.energyLevel ? .yellow : settings.currentTheme.textColor.opacity(0.3))
                 }
             }
             
-            Text(value)
-                .font(.title3.bold())
-                .foregroundColor(settings.currentTheme.textColor)
+            // Key metrics
+            HStack(spacing: 16) {
+                RevisionMetricPill(value: "\(todaysRevision.keyAchievements.count)", label: "Wins", color: .green)
+                RevisionMetricPill(value: "\(todaysRevision.gratitudeList.count)", label: "Gratitude", color: .blue)
+            }
+            
+            Button(action: { showingAddRevision = true }) {
+                Text(todaysRevision.whatWentWell.isEmpty ? "Start Today's Review" : "Edit Today's Review")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(settings.currentTheme.accentColor)
+                    .cornerRadius(10)
+            }
+            .padding(.horizontal)
         }
         .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(settings.currentTheme.backgroundColor == .black ? Color.gray.opacity(0.2) :
-                    settings.currentTheme.backgroundColor == .darkPurple ? Color.neonBlue.opacity(0.1) :
-                    Color.white)
-        .cornerRadius(10)
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(color.opacity(0.3), lineWidth: 1)
-        )
+        .background(settings.currentTheme.backgroundColor.opacity(0.2))
+        .cornerRadius(12)
+        .padding(.horizontal)
+    }
+    
+    private var weeklyRetrospectiveSection: some View {
+        VStack(spacing: 16) {
+            HStack {
+                Text("Weekly Retrospective")
+                    .font(.title2.bold())
+                    .foregroundColor(settings.currentTheme.textColor)
+                
+                Spacer()
+                
+                if getCurrentWeeklyRetrospective() != nil {
+                    Button(action: { showingWeeklyRetrospective = true }) {
+                        Text("View")
+                            .foregroundColor(settings.currentTheme.accentColor)
+                    }
+                }
+            }
+            .padding(.horizontal)
+            
+            if let currentRetro = getCurrentWeeklyRetrospective() {
+                WeeklyRetrospectiveCard(retrospective: currentRetro)
+                    .onTapGesture { showingWeeklyRetrospective = true }
+                    .padding(.horizontal)
+            } else {
+                Text("Your weekly retrospective will be available at the end of the week")
+                    .font(.subheadline)
+                    .foregroundColor(settings.currentTheme.textColor.opacity(0.7))
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(settings.currentTheme.backgroundColor.opacity(0.1))
+                    .cornerRadius(10)
+                    .padding(.horizontal)
+            }
+        }
+    }
+    
+    private var recentRevisionsSection: some View {
+        VStack(spacing: 16) {
+            HStack {
+                Text("Recent Days")
+                    .font(.title2.bold())
+                    .foregroundColor(settings.currentTheme.textColor)
+                
+                Spacer()
+            }
+            .padding(.horizontal)
+            
+            ForEach(revisionStore.dailyRevisions.sorted(by: { $0.date > $1.date }).prefix(3)) { revision in
+                DailyRevisionCard(revision: revision)
+                    .padding(.horizontal)
+            }
+        }
+    }
+    
+    private func getCurrentWeeklyRetrospective() -> RevisionStore.WeeklyRetrospective? {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        
+        return revisionStore.weeklyRetrospectives.first { retrospective in
+            calendar.isDate(today, equalTo: retrospective.endDate, toGranularity: .day)
+        }
+    }
+    
+    private func moodToColor(_ mood: RevisionStore.DailyRevision.Mood) -> Color {
+        switch mood {
+        case .terrible: return .red
+        case .bad: return .orange
+        case .neutral: return .gray
+        case .good: return .green
+        case .great: return .blue
+        }
     }
 }
 
-struct StatusRecordRow: View {
+struct DailyRevisionCard: View {
     @EnvironmentObject var settings: SettingsStore
-    let record: StatusRecord
+    let revision: RevisionStore.DailyRevision
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(record.date, format: .dateTime.day().month().year())
-                .font(.headline)
-                .foregroundColor(settings.currentTheme.textColor)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(revision.date, format: .dateTime.day().month())
+                    .font(.headline)
+                    .foregroundColor(settings.currentTheme.textColor)
+                
+                Spacer()
+                
+                Text(revision.mood.rawValue)
+                    .font(.title3)
+            }
             
-            HStack(spacing: 16) {
-                StatusPill(value: "\(record.followers)", label: "Followers", color: .green)
-                StatusPill(value: "\(record.posts)", label: "Posts", color: .blue)
-                StatusPill(value: "\(record.engagement)%", label: "Engagement", color: .purple)
-                StatusPill(value: "\(record.minutesSpent)m", label: "Time", color: .orange)
+            if !revision.whatWentWell.isEmpty {
+                Text(revision.whatWentWell)
+                    .font(.subheadline)
+                    .foregroundColor(settings.currentTheme.textColor)
+                    .lineLimit(2)
+            }
+            
+            if !revision.keyAchievements.isEmpty {
+                HStack {
+                    Image(systemName: "star.fill")
+                        .foregroundColor(.yellow)
+                    Text("\(revision.keyAchievements.count) achievements")
+                        .font(.caption)
+                        .foregroundColor(settings.currentTheme.textColor.opacity(0.7))
+                }
             }
         }
         .padding()
-        .background(settings.currentTheme.backgroundColor == .black ? Color.gray.opacity(0.2) :
-                    settings.currentTheme.backgroundColor == .darkPurple ? Color.neonBlue.opacity(0.1) :
-                    Color.white)
+        .background(settings.currentTheme.backgroundColor.opacity(0.2))
         .cornerRadius(10)
-        .shadow(color: settings.currentTheme.textColor.opacity(0.1), radius: 2, x: 0, y: 1)
     }
 }
 
-struct StatusPill: View {
+struct WeeklyRetrospectiveCard: View {
+    @EnvironmentObject var settings: SettingsStore
+    let retrospective: RevisionStore.WeeklyRetrospective
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Week of \(retrospective.startDate, format: .dateTime.day().month())")
+                    .font(.headline)
+                    .foregroundColor(settings.currentTheme.textColor)
+                
+                Spacer()
+                
+                // Rating stars
+                HStack(spacing: 2) {
+                    ForEach(1...5, id: \.self) { star in
+                        Image(systemName: star <= retrospective.rating / 2 ? "star.fill" : "star")
+                            .foregroundColor(star <= retrospective.rating / 2 ? .yellow : .gray)
+                            .font(.caption)
+                    }
+                }
+            }
+            
+            if !retrospective.weeklyWins.isEmpty {
+                Text("\(retrospective.weeklyWins.count) wins recorded")
+                    .font(.subheadline)
+                    .foregroundColor(settings.currentTheme.textColor.opacity(0.8))
+            }
+            
+            if !retrospective.keyLearnings.isEmpty {
+                Text("\(retrospective.keyLearnings.count) key learnings")
+                    .font(.subheadline)
+                    .foregroundColor(settings.currentTheme.textColor.opacity(0.8))
+            }
+            
+            Text("Tap to view full retrospective")
+                .font(.caption)
+                .foregroundColor(settings.currentTheme.accentColor)
+        }
+        .padding()
+        .background(settings.currentTheme.backgroundColor.opacity(0.2))
+        .cornerRadius(10)
+    }
+}
+
+struct AddRevisionView: View {
+    @EnvironmentObject var settings: SettingsStore
+    @ObservedObject var revisionStore: RevisionStore
+    @Environment(\.presentationMode) var presentationMode
+    
+    @State private var whatWentWell = ""
+    @State private var whatToImprove = ""
+    @State private var lessonsLearned = ""
+    @State private var tomorrowFocus = ""
+    @State private var energyLevel: Int = 3
+    @State private var mood: RevisionStore.DailyRevision.Mood = .neutral
+    @State private var keyAchievements: [String] = []
+    @State private var newAchievement = ""
+    @State private var gratitudeList: [String] = []
+    @State private var newGratitudeItem = ""
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Mood and Energy Section
+                    moodAndEnergySection
+                    
+                    // Core Reflection Sections
+                    reflectionSection(title: "What Went Well", text: $whatWentWell, icon: "hand.thumbsup.fill", color: .green)
+                    reflectionSection(title: "What To Improve", text: $whatToImprove, icon: "exclamationmark.triangle.fill", color: .orange)
+                    reflectionSection(title: "Lessons Learned", text: $lessonsLearned, icon: "lightbulb.fill", color: .yellow)
+                    reflectionSection(title: "Tomorrow's Focus", text: $tomorrowFocus, icon: "target", color: .blue)
+                    
+                    // Achievements Section
+                    achievementsSection
+                    
+                    // Gratitude Section
+                    gratitudeSection
+                    
+                    // Save Button
+                    saveButton
+                }
+                .padding()
+            }
+            .navigationTitle("Daily Revision")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Cancel") {
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                    .foregroundColor(settings.currentTheme.accentColor)
+                }
+            }
+            .onAppear {
+                let todaysRevision = revisionStore.getTodaysRevision()
+                whatWentWell = todaysRevision.whatWentWell
+                whatToImprove = todaysRevision.whatToImprove
+                lessonsLearned = todaysRevision.lessonsLearned
+                tomorrowFocus = todaysRevision.tomorrowFocus
+                energyLevel = todaysRevision.energyLevel
+                mood = todaysRevision.mood
+                keyAchievements = todaysRevision.keyAchievements
+                gratitudeList = todaysRevision.gratitudeList
+            }
+        }
+    }
+    
+    private var moodAndEnergySection: some View {
+        VStack(spacing: 16) {
+            Text("How was your day?")
+                .font(.headline)
+                .foregroundColor(settings.currentTheme.textColor)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            
+            // Mood Picker
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Mood:")
+                    .font(.subheadline)
+                    .foregroundColor(settings.currentTheme.textColor.opacity(0.8))
+                
+                HStack {
+                    ForEach(RevisionStore.DailyRevision.Mood.allCases, id: \.self) { moodOption in
+                        Button(action: { mood = moodOption }) {
+                            Text(moodOption.rawValue)
+                                .font(.title)
+                                .padding(8)
+                                .background(mood == moodOption ? moodToColor(moodOption).opacity(0.3) : Color.clear)
+                                .clipShape(Circle())
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+                .frame(maxWidth: .infinity)
+            }
+            
+            // Energy Level
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Energy Level:")
+                    .font(.subheadline)
+                    .foregroundColor(settings.currentTheme.textColor.opacity(0.8))
+                
+                HStack {
+                    ForEach(1...5, id: \.self) { level in
+                        Button(action: { energyLevel = level }) {
+                            Image(systemName: "bolt\(level <= energyLevel ? ".fill" : "")")
+                                .foregroundColor(level <= energyLevel ? .yellow : settings.currentTheme.textColor.opacity(0.3))
+                                .padding(8)
+                                .background(level <= energyLevel ? Color.yellow.opacity(0.2) : Color.clear)
+                                .clipShape(Circle())
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(settings.currentTheme.backgroundColor.opacity(0.1))
+        .cornerRadius(10)
+    }
+    
+    private func reflectionSection(title: String, text: Binding<String>, icon: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundColor(color)
+                Text(title)
+                    .font(.headline)
+                    .foregroundColor(settings.currentTheme.textColor)
+            }
+            
+            TextEditor(text: text)
+                .frame(minHeight: 100)
+                .padding(8)
+                .background(settings.currentTheme.backgroundColor.opacity(0.1))
+                .cornerRadius(8)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(color.opacity(0.3), lineWidth: 1)
+                )
+        }
+    }
+    
+    private var achievementsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: "star.fill")
+                    .foregroundColor(.yellow)
+                Text("Key Achievements")
+                    .font(.headline)
+                    .foregroundColor(settings.currentTheme.textColor)
+            }
+            
+            ForEach(keyAchievements, id: \.self) { achievement in
+                HStack {
+                    Text("• \(achievement)")
+                        .font(.subheadline)
+                        .foregroundColor(settings.currentTheme.textColor)
+                    Spacer()
+                    Button(action: {
+                        if let index = keyAchievements.firstIndex(of: achievement) {
+                            keyAchievements.remove(at: index)
+                        }
+                    }) {
+                        Image(systemName: "trash")
+                            .foregroundColor(.red)
+                    }
+                }
+                .padding(8)
+                .background(settings.currentTheme.backgroundColor.opacity(0.1))
+                .cornerRadius(5)
+            }
+            
+            HStack {
+                TextField("Add an achievement", text: $newAchievement)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                
+                Button(action: {
+                    if !newAchievement.isEmpty {
+                        keyAchievements.append(newAchievement)
+                        newAchievement = ""
+                    }
+                }) {
+                    Image(systemName: "plus.circle.fill")
+                        .foregroundColor(.green)
+                }
+            }
+        }
+    }
+    
+    private var gratitudeSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: "heart.fill")
+                    .foregroundColor(.pink)
+                Text("Gratitude List")
+                    .font(.headline)
+                    .foregroundColor(settings.currentTheme.textColor)
+            }
+            
+            ForEach(gratitudeList, id: \.self) { item in
+                HStack {
+                    Text("• \(item)")
+                        .font(.subheadline)
+                        .foregroundColor(settings.currentTheme.textColor)
+                    Spacer()
+                    Button(action: {
+                        if let index = gratitudeList.firstIndex(of: item) {
+                            gratitudeList.remove(at: index)
+                        }
+                    }) {
+                        Image(systemName: "trash")
+                            .foregroundColor(.red)
+                    }
+                }
+                .padding(8)
+                .background(settings.currentTheme.backgroundColor.opacity(0.1))
+                .cornerRadius(5)
+            }
+            
+            HStack {
+                TextField("I'm grateful for...", text: $newGratitudeItem)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                
+                Button(action: {
+                    if !newGratitudeItem.isEmpty {
+                        gratitudeList.append(newGratitudeItem)
+                        newGratitudeItem = ""
+                    }
+                }) {
+                    Image(systemName: "plus.circle.fill")
+                        .foregroundColor(.green)
+                }
+            }
+        }
+    }
+    
+    private var saveButton: some View {
+        Button(action: saveChanges) {
+            Text("Save Daily Revision")
+                .font(.headline)
+                .foregroundColor(.white)
+                .padding()
+                .frame(maxWidth: .infinity)
+                .background(LinearGradient(
+                    gradient: Gradient(colors: [
+                        settings.currentTheme.accentColor,
+                        settings.currentTheme.primaryColor
+                    ]),
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ))
+                .cornerRadius(10)
+        }
+    }
+    
+    private func moodToColor(_ mood: RevisionStore.DailyRevision.Mood) -> Color {
+        switch mood {
+        case .terrible: return .red
+        case .bad: return .orange
+        case .neutral: return .gray
+        case .good: return .green
+        case .great: return .blue
+        }
+    }
+    
+    private func saveChanges() {
+        let revision = RevisionStore.DailyRevision(
+            whatWentWell: whatWentWell,
+            whatToImprove: whatToImprove,
+            lessonsLearned: lessonsLearned,
+            tomorrowFocus: tomorrowFocus,
+            energyLevel: energyLevel,
+            mood: mood,
+            keyAchievements: keyAchievements,
+            gratitudeList: gratitudeList
+        )
+        
+        revisionStore.addRevision(revision)
+        presentationMode.wrappedValue.dismiss()
+    }
+}
+
+struct WeeklyRetrospectiveView: View {
+    @EnvironmentObject var settings: SettingsStore
+    let retrospective: RevisionStore.WeeklyRetrospective?
+    @ObservedObject var revisionStore: RevisionStore
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                if let retrospective = retrospective {
+                    VStack(spacing: 20) {
+                        // Header with week info
+                        VStack {
+                            Text("Weekly Retrospective")
+                                .font(.title.bold())
+                                .foregroundColor(settings.currentTheme.textColor)
+                            
+                            Text("\(retrospective.startDate, format: .dateTime.day().month()) - \(retrospective.endDate, format: .dateTime.day().month())")
+                                .font(.subheadline)
+                                .foregroundColor(settings.currentTheme.textColor.opacity(0.7))
+                            
+                            // Rating
+                            HStack {
+                                Text("Week Rating:")
+                                    .font(.headline)
+                                    .foregroundColor(settings.currentTheme.textColor)
+                                
+                                ForEach(1...5, id: \.self) { star in
+                                    Image(systemName: star <= retrospective.rating / 2 ? "star.fill" : "star")
+                                        .foregroundColor(star <= retrospective.rating / 2 ? .yellow : .gray)
+                                }
+                            }
+                            .padding(.top, 8)
+                        }
+                        
+                        // Weekly Wins
+                        retrospectiveSection(
+                            title: "Weekly Wins",
+                            icon: "trophy.fill",
+                            color: .green,
+                            items: retrospective.weeklyWins
+                        )
+                        
+                        // Challenges
+                        retrospectiveSection(
+                            title: "Biggest Challenges",
+                            icon: "exclamationmark.triangle.fill",
+                            color: .orange,
+                            items: retrospective.biggestChallenges
+                        )
+                        
+                        // Learnings
+                        retrospectiveSection(
+                            title: "Key Learnings",
+                            icon: "lightbulb.fill",
+                            color: .yellow,
+                            items: retrospective.keyLearnings
+                        )
+                        
+                        // Improvement Plan
+                        retrospectiveSection(
+                            title: "Improvement Plan",
+                            icon: "arrow.up.forward",
+                            color: .blue,
+                            items: retrospective.improvementPlan
+                        )
+                        
+                        // Mood Chart
+                        moodChartSection
+                    }
+                    .padding()
+                } else {
+                    Text("No retrospective available for this week")
+                        .foregroundColor(settings.currentTheme.textColor)
+                        .padding()
+                }
+            }
+            .navigationTitle("Weekly Review")
+        }
+    }
+    
+    private func retrospectiveSection(title: String, icon: String, color: Color, items: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundColor(color)
+                Text(title)
+                    .font(.headline)
+                    .foregroundColor(settings.currentTheme.textColor)
+                Spacer()
+                Text("\(items.count)")
+                    .font(.subheadline)
+                    .foregroundColor(settings.currentTheme.textColor.opacity(0.7))
+            }
+            
+            if items.isEmpty {
+                Text("No \(title.lowercased()) recorded")
+                    .font(.subheadline)
+                    .foregroundColor(settings.currentTheme.textColor.opacity(0.5))
+                    .padding(8)
+                    .frame(maxWidth: .infinity)
+                    .background(settings.currentTheme.backgroundColor.opacity(0.1))
+                    .cornerRadius(8)
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(items, id: \.self) { item in
+                        Text("• \(item)")
+                            .font(.subheadline)
+                            .foregroundColor(settings.currentTheme.textColor)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .padding()
+                .background(settings.currentTheme.backgroundColor.opacity(0.1))
+                .cornerRadius(10)
+            }
+        }
+    }
+    
+    private var moodChartSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: "face.smiling.fill")
+                    .foregroundColor(.pink)
+                Text("Mood Throughout the Week")
+                    .font(.headline)
+                    .foregroundColor(settings.currentTheme.textColor)
+            }
+            
+            // Get the daily revisions for this week
+            let weekRevisions = revisionStore.getRevisionsForWeek(containing: retrospective?.endDate ?? Date())
+            
+            if weekRevisions.isEmpty {
+                Text("No daily data available")
+                    .font(.subheadline)
+                    .foregroundColor(settings.currentTheme.textColor.opacity(0.5))
+                    .padding(8)
+                    .frame(maxWidth: .infinity)
+                    .background(settings.currentTheme.backgroundColor.opacity(0.1))
+                    .cornerRadius(8)
+            } else {
+                MoodChart(revisions: weekRevisions)
+                    .frame(height: 200)
+                    .padding()
+                    .background(settings.currentTheme.backgroundColor.opacity(0.1))
+                    .cornerRadius(10)
+            }
+        }
+    }
+}
+
+struct MoodChart: View {
+    @EnvironmentObject var settings: SettingsStore
+    let revisions: [RevisionStore.DailyRevision]
+    
+    private var maxMoodValue: Int {
+        RevisionStore.DailyRevision.Mood.allCases.count - 1
+    }
+    
+    private var moodData: [(day: String, mood: Int)] {
+        revisions.map { revision in
+            let day = revision.date.formatted(.dateTime.weekday(.abbreviated))
+            let moodValue = RevisionStore.DailyRevision.Mood.allCases.firstIndex(of: revision.mood) ?? 2
+            return (day: day, mood: moodValue)
+        }
+    }
+    
+    var body: some View {
+        VStack {
+            GeometryReader { geometry in
+                let width = geometry.size.width
+                let height = geometry.size.height
+                let stepX = width / CGFloat(max(1, moodData.count - 1))
+                let stepY = height / CGFloat(maxMoodValue)
+                
+                // Y-axis labels
+                ForEach(0...maxMoodValue, id: \.self) { level in
+                    let mood = RevisionStore.DailyRevision.Mood.allCases[level]
+                    let yPosition = height - (CGFloat(level) * stepY)
+                    
+                    HStack {
+                        Text(mood.rawValue)
+                            .font(.caption)
+                            .foregroundColor(settings.currentTheme.textColor.opacity(0.7))
+                        Spacer()
+                    }
+                    .offset(y: yPosition - 10)
+                }
+                // Chart line
+                Path { path in
+                    for (index, data) in moodData.enumerated() {
+                        let x = CGFloat(index) * stepX
+                        let y = height - (CGFloat(data.mood) * stepY)
+                        
+                        if index == 0 {
+                            path.move(to: CGPoint(x: x, y: y))
+                        } else {
+                            path.addLine(to: CGPoint(x: x, y: y))
+                        }
+                    }
+                }
+                .stroke(settings.currentTheme.accentColor, lineWidth: 2)
+                
+                // Data points
+                ForEach(Array(moodData.enumerated()), id: \.offset) { index, data in
+                    let x = CGFloat(index) * stepX
+                    let y = height - (CGFloat(data.mood) * stepY)
+                    
+                    Circle()
+                        .fill(settings.currentTheme.accentColor)
+                        .frame(width: 8, height: 8)
+                        .offset(x: x - 4, y: y - 4)
+                    
+                    Text(data.day)
+                        .font(.caption)
+                        .foregroundColor(settings.currentTheme.textColor)
+                        .offset(x: x - 10, y: height - 20)
+                }
+            }
+        }
+    }
+}
+
+struct RevisionMetricPill: View {
     @EnvironmentObject var settings: SettingsStore
     let value: String
     let label: String
@@ -3263,244 +5116,9 @@ struct StatusPill: View {
                 .foregroundColor(settings.currentTheme.textColor.opacity(0.7))
         }
         .padding(8)
+        .frame(minWidth: 60)
         .background(color.opacity(0.2))
         .cornerRadius(20)
-    }
-}
-
-struct AddStatusView: View {
-    @EnvironmentObject var settings: SettingsStore
-    @ObservedObject var statusStore: StatusStore
-    @State private var followers = ""
-    @State private var posts = ""
-    @State private var engagement = ""
-    @State private var minutesSpent = ""
-    @State private var date = Date()
-    @Environment(\.presentationMode) var presentationMode
-    
-    var body: some View {
-        NavigationView {
-            ZStack {
-                settings.currentTheme.backgroundColor
-                    .edgesIgnoringSafeArea(.all)
-                
-                Form {
-                    Section(header: Text("Status Details").foregroundColor(settings.currentTheme.accentColor)) {
-                        DatePicker("Date", selection: $date, displayedComponents: .date)
-                            .accentColor(settings.currentTheme.accentColor)
-                        
-                        HStack {
-                            Image(systemName: "person.2.fill")
-                                .foregroundColor(.green)
-                            TextField("Followers Count", text: $followers)
-                                .keyboardType(.numberPad)
-                        }
-                        
-                        HStack {
-                            Image(systemName: "photo.stack.fill")
-                                .foregroundColor(.blue)
-                            TextField("Posts Today", text: $posts)
-                                .keyboardType(.numberPad)
-                        }
-                        
-                        HStack {
-                            Image(systemName: "heart.fill")
-                                .foregroundColor(.purple)
-                            TextField("Engagement %", text: $engagement)
-                                .keyboardType(.decimalPad)
-                        }
-
-                        HStack {
-                            Image(systemName: "clock.fill")
-                                .foregroundColor(.orange)
-                            TextField("Minutes Spent", text: $minutesSpent)
-                                .keyboardType(.numberPad)
-                        }
-                    }
-                    .listRowBackground(settings.currentTheme.backgroundColor.opacity(0.8))
-                    
-                    Section {
-                        Button(action: addStatusData) {
-                            HStack {
-                                Spacer()
-                                Text("Save Status")
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.white)
-                                Spacer()
-                            }
-                            .padding()
-                            .background(LinearGradient(
-                                gradient: Gradient(colors: [
-                                    settings.currentTheme.accentColor,
-                                    settings.currentTheme.primaryColor
-                                ]),
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            ))
-                            .cornerRadius(10)
-                        }
-                        .disabled(followers.isEmpty || posts.isEmpty || engagement.isEmpty || minutesSpent.isEmpty)
-                    }
-                    .listRowBackground(Color.clear)
-                }
-                .background(settings.currentTheme.backgroundColor)
-                .navigationTitle("Add Status")
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Cancel") {
-                            presentationMode.wrappedValue.dismiss()
-                        }
-                        .foregroundColor(settings.currentTheme.accentColor)
-                    }
-                }
-            }
-        }
-        .accentColor(settings.currentTheme.accentColor)
-    }
-    
-    private func addStatusData() {
-        if let followersValue = Int(followers),
-           let postsValue = Int(posts),
-           let engagementValue = Double(engagement),
-           let minutesValue = Int(minutesSpent) {
-            statusStore.addRecord(
-                followers: followersValue,
-                posts: postsValue,
-                engagement: engagementValue,
-                minutesSpent: minutesValue,
-                date: date
-            )
-            presentationMode.wrappedValue.dismiss()
-        }
-    }
-}
-
-//MARK: - Revision View
-struct RevisionView: View {
-    @EnvironmentObject var settings: SettingsStore
-    @StateObject private var revisionStore = RevisionStore()
-    @State private var showingAddRevision = false
-    
-    var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 20) {
-                    let todaysRevision = revisionStore.getTodaysRevision()
-                    
-                    RevisionSection(title: "What Went Well", content: todaysRevision.whatWentWell)
-                    RevisionSection(title: "What To Improve", content: todaysRevision.whatToImprove)
-                    RevisionSection(title: "Lessons Learned", content: todaysRevision.lessonsLearned)
-                    RevisionSection(title: "Tomorrow's Focus", content: todaysRevision.tomorrowFocus)
-                    
-                    Button(action: {
-                        showingAddRevision = true
-                    }) {
-                        Text("Edit Today's Revision")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .padding()
-                            .frame(maxWidth: .infinity)
-                            .background(settings.currentTheme.accentColor)
-                            .cornerRadius(10)
-                    }
-                    .padding()
-                }
-                .padding(.top)
-            }
-            .navigationTitle("Daily Revision")
-            .sheet(isPresented: $showingAddRevision) {
-                AddRevisionView(revisionStore: revisionStore)
-            }
-        }
-    }
-}
-
-struct RevisionSection: View {
-    @EnvironmentObject var settings: SettingsStore
-    let title: String
-    let content: String
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.headline)
-                .foregroundColor(settings.currentTheme.textColor)
-            
-            Text(content.isEmpty ? "Not answered yet" : content)
-                .foregroundColor(content.isEmpty ? settings.currentTheme.textColor.opacity(0.5) : settings.currentTheme.textColor)
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(settings.currentTheme.backgroundColor.opacity(0.2))
-                .cornerRadius(8)
-        }
-        .padding(.horizontal)
-    }
-}
-
-struct AddRevisionView: View {
-    @EnvironmentObject var settings: SettingsStore
-    @ObservedObject var revisionStore: RevisionStore
-    @Environment(\.presentationMode) var presentationMode
-    
-    @State private var whatWentWell = ""
-    @State private var whatToImprove = ""
-    @State private var lessonsLearned = ""
-    @State private var tomorrowFocus = ""
-    
-    var body: some View {
-        NavigationView {
-            Form {
-                Section(header: Text("What Went Well").foregroundColor(settings.currentTheme.accentColor)) {
-                    TextEditor(text: $whatWentWell)
-                        .frame(minHeight: 100)
-                }
-                
-                Section(header: Text("What To Improve").foregroundColor(settings.currentTheme.accentColor)) {
-                    TextEditor(text: $whatToImprove)
-                        .frame(minHeight: 100)
-                }
-                
-                Section(header: Text("Lessons Learned").foregroundColor(settings.currentTheme.accentColor)) {
-                    TextEditor(text: $lessonsLearned)
-                        .frame(minHeight: 100)
-                }
-                
-                Section(header: Text("Tomorrow's Focus").foregroundColor(settings.currentTheme.accentColor)) {
-                    TextEditor(text: $tomorrowFocus)
-                        .frame(minHeight: 100)
-                }
-                
-                Section {
-                    Button("Save Revision") {
-                        let revision = RevisionStore.DailyRevision(
-                            whatWentWell: whatWentWell,
-                            whatToImprove: whatToImprove,
-                            lessonsLearned: lessonsLearned,
-                            tomorrowFocus: tomorrowFocus
-                        )
-                        revisionStore.addRevision(revision)
-                        presentationMode.wrappedValue.dismiss()
-                    }
-                    .frame(maxWidth: .infinity)
-                    .disabled(whatWentWell.isEmpty && whatToImprove.isEmpty && lessonsLearned.isEmpty && tomorrowFocus.isEmpty)
-                }
-            }
-            .navigationTitle("Daily Revision")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Cancel") {
-                        presentationMode.wrappedValue.dismiss()
-                    }
-                }
-            }
-            .onAppear {
-                let todaysRevision = revisionStore.getTodaysRevision()
-                whatWentWell = todaysRevision.whatWentWell
-                whatToImprove = todaysRevision.whatToImprove
-                lessonsLearned = todaysRevision.lessonsLearned
-                tomorrowFocus = todaysRevision.tomorrowFocus
-            }
-        }
     }
 }
 
@@ -3510,86 +5128,394 @@ struct GoalsView: View {
     @StateObject private var goalsStore = GoalsStore()
     @State private var showingAddGoal = false
     @State private var selectedGoalType: GoalsStore.GoalType = .daily
+    @State private var searchText = ""
+    @State private var showingCompleted = true
+    @State private var editingGoal: GoalsStore.Goal? = nil
+
+    var filteredGoals: [GoalsStore.Goal] {
+        var goals = goalsStore.goalsForType(selectedGoalType)
+        
+        if !searchText.isEmpty {
+            goals = goals.filter {
+                $0.title.localizedCaseInsensitiveContains(searchText) ||
+                $0.description.localizedCaseInsensitiveContains(searchText)
+            }
+        }
+        
+        if !showingCompleted {
+            goals = goals.filter { !$0.isCompleted }
+        }
+        
+        return goals.sorted {
+            if $0.isCompleted != $1.isCompleted {
+                return !$0.isCompleted
+            }
+            return $0.targetDate < $1.targetDate
+        }
+    }
     
     var body: some View {
         NavigationView {
-            VStack {
-                // Goal type selector
-                Picker("Goal Type", selection: $selectedGoalType) {
-                    ForEach(GoalsStore.GoalType.allCases, id: \.self) { type in
-                        Text(type.rawValue).tag(type)
+            VStack(spacing: 0) {
+                // Search and filter bar
+                VStack(spacing: 12) {
+                    SearchBar(text: $searchText, placeholder: "Search goals")
+                    
+                    HStack {
+                        Picker("Goal Type", selection: $selectedGoalType) {
+                            ForEach(GoalsStore.GoalType.allCases, id: \.self) { type in
+                                Text(type.rawValue).tag(type)
+                            }
+                        }
+                        .pickerStyle(SegmentedPickerStyle())
+                        
+                        Button(action: { showingCompleted.toggle() }) {
+                            Image(systemName: showingCompleted ? "checkmark.circle.fill" : "checkmark.circle")
+                                .foregroundColor(showingCompleted ? settings.currentTheme.accentColor : settings.currentTheme.textColor)
+                        }
                     }
+                    .padding(.horizontal)
                 }
-                .pickerStyle(SegmentedPickerStyle())
-                .padding()
+                .padding(.bottom, 8)
+                .background(settings.currentTheme.backgroundColor.opacity(0.8))
                 
                 // Goals list
-                List {
-                    ForEach(goalsStore.goalsForType(selectedGoalType)) { goal in
-                        GoalRow(goal: goal)
+                if filteredGoals.isEmpty {
+                    EmptyGoalsView(goalType: selectedGoalType)
+                } else {
+                    List {
+                        ForEach(filteredGoals) { goal in
+                            GoalCard(goal: goal)
+                                .swipeActions(edge: .trailing) {
+                                    Button(role: .destructive) {
+                                        goalsStore.deleteGoal(goal)
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                    
+                                    Button {
+                                        editingGoal = goal
+                                    } label: {
+                                        Label("Edit", systemImage: "pencil")
+                                    }
+                                    .tint(.blue)
+                                    
+                                    Button {
+                                        goalsStore.toggleGoalCompletion(goal)
+                                    } label: {
+                                        Label(goal.isCompleted ? "Mark Incomplete" : "Complete",
+                                              systemImage: goal.isCompleted ? "arrow.uturn.backward" : "checkmark")
+                                    }
+                                    .tint(goal.isCompleted ? .orange : .green)
+                                }
+                                .onTapGesture {
+                                    editingGoal = goal
+                                }
+                        }
                     }
+                    .listStyle(.plain)
                 }
-                .listStyle(.plain)
-                
-                Spacer()
             }
             .navigationTitle("My Goals")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        showingAddGoal = true
-                    }) {
+                    Button(action: { showingAddGoal = true }) {
                         Image(systemName: "plus")
                             .foregroundColor(settings.currentTheme.accentColor)
                     }
                 }
             }
             .sheet(isPresented: $showingAddGoal) {
-                AddGoalView(goalsStore: goalsStore, selectedType: selectedGoalType)
+                AddEditGoalView(goalsStore: goalsStore, goal: nil, selectedType: selectedGoalType)
+            }
+            .sheet(item: $editingGoal) { goal in
+                AddEditGoalView(goalsStore: goalsStore, goal: goal, selectedType: goal.type)
             }
         }
     }
 }
 
-struct GoalRow: View {
+struct AddEditGoalView: View {
+    @EnvironmentObject var settings: SettingsStore
+    @ObservedObject var goalsStore: GoalsStore
+    var goal: GoalsStore.Goal?
+    let selectedType: GoalsStore.GoalType
+    @Environment(\.presentationMode) var presentationMode
+    
+    @State private var title: String
+    @State private var description: String
+    @State private var targetDate: Date
+    @State private var progress: Double
+    @State private var showingDatePicker = false
+    
+    init(goalsStore: GoalsStore, goal: GoalsStore.Goal?, selectedType: GoalsStore.GoalType) {
+        self.goalsStore = goalsStore
+        self.goal = goal
+        self.selectedType = selectedType
+        
+        if let existingGoal = goal {
+            _title = State(initialValue: existingGoal.title)
+            _description = State(initialValue: existingGoal.description)
+            _targetDate = State(initialValue: existingGoal.targetDate)
+            _progress = State(initialValue: existingGoal.progress)
+        } else {
+            _title = State(initialValue: "")
+            _description = State(initialValue: "")
+            
+            // Set default target date based on goal type
+            let calendar = Calendar.current
+            var dateComponents = DateComponents()
+            
+            switch selectedType {
+            case .daily:
+                dateComponents.day = 1
+            case .monthly:
+                dateComponents.month = 1
+            case .quarterly:
+                dateComponents.month = 3
+            }
+            
+            _targetDate = State(initialValue: calendar.date(byAdding: dateComponents, to: Date()) ?? Date())
+            _progress = State(initialValue: 0)
+        }
+    }
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section {
+                    TextField("Goal title", text: $title)
+                        .font(.headline)
+                    
+                    TextField("Description (optional)", text: $description)
+                }
+                
+                Section {
+                    HStack {
+                        Text("Goal Type")
+                        Spacer()
+                        Text(selectedType.rawValue)
+                            .foregroundColor(settings.currentTheme.textColor.opacity(0.7))
+                    }
+                    
+                    HStack {
+                        Text("Target Date")
+                        Spacer()
+                        Button(action: { showingDatePicker.toggle() }) {
+                            Text(targetDate.formatted(date: .abbreviated, time: .omitted))
+                                .foregroundColor(settings.currentTheme.textColor)
+                        }
+                    }
+                    
+                    if showingDatePicker {
+                        DatePicker(
+                            "Select target date",
+                            selection: $targetDate,
+                            in: Date()...,
+                            displayedComponents: .date
+                        )
+                        .datePickerStyle(.graphical)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Progress: \(Int(progress * 100))%")
+                            .font(.subheadline)
+                        
+                        Slider(value: $progress, in: 0...1, step: 0.05)
+                            .tint(progress >= 1 ? .green : settings.currentTheme.accentColor)
+                        
+                        HStack {
+                            ForEach([0, 0.25, 0.5, 0.75, 1.0], id: \.self) { value in
+                                Button(action: { progress = value }) {
+                                    Text("\(Int(value * 100))%")
+                                        .font(.caption)
+                                        .padding(4)
+                                        .frame(minWidth: 30)
+                                        .background(progress == value ? settings.currentTheme.accentColor.opacity(0.3) : Color.clear)
+                                        .cornerRadius(4)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                            }
+                        }
+                    }
+                }
+                
+                Section {
+                    Button(action: saveGoal) {
+                        HStack {
+                            Spacer()
+                            Text(goal == nil ? "Add Goal" : "Save Changes")
+                                .fontWeight(.bold)
+                            Spacer()
+                        }
+                    }
+                    .disabled(title.isEmpty)
+                    .tint(settings.currentTheme.accentColor)
+                }
+                
+                if goal != nil {
+                    Section {
+                        Button(role: .destructive) {
+                            if let goal = goal {
+                                goalsStore.deleteGoal(goal)
+                            }
+                            presentationMode.wrappedValue.dismiss()
+                        } label: {
+                            HStack {
+                                Spacer()
+                                Text("Delete Goal")
+                                Spacer()
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle(goal == nil ? "New \(selectedType.rawValue) Goal" : "Edit Goal")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                }
+            }
+        }
+    }
+    
+    private func saveGoal() {
+        let updatedGoal = GoalsStore.Goal(
+            id: goal?.id ?? UUID(),
+            type: selectedType,
+            title: title,
+            description: description,
+            isCompleted: progress >= 1.0,
+            targetDate: targetDate,
+            progress: progress
+        )
+        
+        if goal != nil {
+            goalsStore.updateGoal(updatedGoal)
+        } else {
+            goalsStore.addGoal(updatedGoal)
+        }
+        
+        presentationMode.wrappedValue.dismiss()
+    }
+}
+
+struct GoalCard: View {
     @EnvironmentObject var settings: SettingsStore
     let goal: GoalsStore.Goal
     
+    private var daysRemaining: Int {
+        Calendar.current.dateComponents([.day], from: Date(), to: goal.targetDate).day ?? 0
+    }
+    
+    private var progressColor: Color {
+        if goal.progress >= 1.0 {
+            return .green
+        } else if daysRemaining <= 0 {
+            return .red
+        } else {
+            return settings.currentTheme.accentColor
+        }
+    }
+    
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(goal.title)
-                    .font(.headline)
-                    .foregroundColor(settings.currentTheme.textColor)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(goal.title)
+                        .font(.headline)
+                        .foregroundColor(settings.currentTheme.textColor)
+                        .strikethrough(goal.isCompleted)
+                    
+                    if !goal.description.isEmpty {
+                        Text(goal.description)
+                            .font(.subheadline)
+                            .foregroundColor(settings.currentTheme.textColor.opacity(0.7))
+                            .strikethrough(goal.isCompleted)
+                    }
+                }
                 
                 Spacer()
                 
-                if goal.isCompleted {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
+                VStack(alignment: .trailing) {
+                    if goal.isCompleted {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                            .font(.title2)
+                    } else {
+                        Text("\(daysRemaining > 0 ? daysRemaining : 0)d")
+                            .font(.caption)
+                            .foregroundColor(daysRemaining <= 0 ? .red : settings.currentTheme.textColor.opacity(0.7))
+                            .padding(6)
+                            .background(Circle().fill(daysRemaining <= 0 ? Color.red.opacity(0.2) : settings.currentTheme.backgroundColor.opacity(0.3)))
+                    }
+                    
+                    Text(goal.targetDate, formatter: dateFormatter)
+                        .font(.caption2)
+                        .foregroundColor(settings.currentTheme.textColor.opacity(0.5))
                 }
             }
             
-            if !goal.description.isEmpty {
-                Text(goal.description)
-                    .font(.subheadline)
+            ProgressView(value: goal.progress, total: 1.0)
+                .tint(progressColor)
+            
+            HStack {
+                Text("\(Int(goal.progress * 100))% complete")
+                    .font(.caption)
+                    .foregroundColor(settings.currentTheme.textColor.opacity(0.7))
+                
+                Spacer()
+                
+                Text(goal.type.rawValue)
+                    .font(.caption)
+                    .padding(4)
+                    .padding(.horizontal, 4)
+                    .background(Capsule().fill(settings.currentTheme.backgroundColor.opacity(0.3)))
                     .foregroundColor(settings.currentTheme.textColor.opacity(0.7))
             }
-            
-            ProgressView(value: goal.progress, total: 1.0)
-                .accentColor(settings.currentTheme.accentColor)
-            
-            Text("Target: \(goal.targetDate, formatter: dateFormatter)")
-                .font(.caption)
-                .foregroundColor(settings.currentTheme.textColor.opacity(0.5))
         }
-        .padding(.vertical, 8)
+        .padding()
+        .background(settings.currentTheme.backgroundColor.opacity(0.1))
+        .cornerRadius(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(settings.currentTheme.backgroundColor.opacity(0.3), lineWidth: 1)
+        )
+        .opacity(goal.isCompleted ? 0.8 : 1.0)
     }
     
     private var dateFormatter: DateFormatter {
         let formatter = DateFormatter()
-        formatter.dateStyle = .medium
+        formatter.dateStyle = .short
         return formatter
+    }
+}
+
+struct EmptyGoalsView: View {
+    @EnvironmentObject var settings: SettingsStore
+    let goalType: GoalsStore.GoalType
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "target")
+                .font(.system(size: 50))
+                .foregroundColor(settings.currentTheme.textColor.opacity(0.3))
+            
+            VStack(spacing: 8) {
+                Text("No \(goalType.rawValue.lowercased()) goals yet")
+                    .font(.title3)
+                    .foregroundColor(settings.currentTheme.textColor)
+                
+                Text("Add your first \(goalType.rawValue.lowercased()) goal to get started")
+                    .font(.subheadline)
+                    .foregroundColor(settings.currentTheme.textColor.opacity(0.7))
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.horizontal, 40)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -3601,48 +5527,99 @@ struct AddGoalView: View {
     
     @State private var title = ""
     @State private var description = ""
-    @State private var targetDate = Date()
+    @State private var targetDate: Date
     @State private var progress: Double = 0
+    @State private var showingDatePicker = false
+    
+    init(goalsStore: GoalsStore, selectedType: GoalsStore.GoalType) {
+        self.goalsStore = goalsStore
+        self.selectedType = selectedType
+        
+        // Set default target date based on goal type
+        let calendar = Calendar.current
+        var dateComponents = DateComponents()
+        
+        switch selectedType {
+        case .daily:
+            dateComponents.day = 1
+        case .monthly:
+            dateComponents.month = 1
+        case .quarterly:
+            dateComponents.month = 3
+        }
+        
+        _targetDate = State(initialValue: calendar.date(byAdding: dateComponents, to: Date()) ?? Date())
+    }
     
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Goal Details").foregroundColor(settings.currentTheme.accentColor)) {
-                    TextField("Title", text: $title)
-                    TextField("Description (optional)", text: $description)
+                Section {
+                    TextField("Goal title", text: $title)
+                        .font(.headline)
                     
-                    DatePicker("Target Date",
-                             selection: $targetDate,
-                             in: Date()...,
-                             displayedComponents: .date)
-                }
-                
-                Section(header: Text("Progress").foregroundColor(settings.currentTheme.accentColor)) {
-                    Slider(value: $progress, in: 0...1, step: 0.1)
-                    Text("\(Int(progress * 100))% complete")
-                        .foregroundColor(settings.currentTheme.textColor)
+                    TextField("Description (optional)", text: $description)
                 }
                 
                 Section {
-                    Button("Add Goal") {
-                        let goal = GoalsStore.Goal(
-                            type: selectedType,
-                            title: title,
-                            description: description,
-                            isCompleted: progress >= 1.0,
-                            targetDate: targetDate,
-                            progress: progress
-                        )
-                        goalsStore.addGoal(goal)
-                        presentationMode.wrappedValue.dismiss()
+                    HStack {
+                        Text("Target Date")
+                        Spacer()
+                        Button(action: { showingDatePicker.toggle() }) {
+                            Text(targetDate.formatted(date: .abbreviated, time: .omitted))
+                                .foregroundColor(settings.currentTheme.textColor)
+                        }
                     }
-                    .frame(maxWidth: .infinity)
+                    
+                    if showingDatePicker {
+                        DatePicker(
+                            "Select target date",
+                            selection: $targetDate,
+                            in: Date()...,
+                            displayedComponents: .date
+                        )
+                        .datePickerStyle(.graphical)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Progress: \(Int(progress * 100))%")
+                            .font(.subheadline)
+                        
+                        Slider(value: $progress, in: 0...1, step: 0.05)
+                            .tint(progress >= 1 ? .green : settings.currentTheme.accentColor)
+                        
+                        HStack {
+                            ForEach([0, 0.25, 0.5, 0.75, 1.0], id: \.self) { value in
+                                Button(action: { progress = value }) {
+                                    Text("\(Int(value * 100))%")
+                                        .font(.caption)
+                                        .padding(4)
+                                        .frame(minWidth: 30)
+                                        .background(progress == value ? settings.currentTheme.accentColor.opacity(0.3) : Color.clear)
+                                        .cornerRadius(4)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                            }
+                        }
+                    }
+                }
+                
+                Section {
+                    Button(action: addGoal) {
+                        HStack {
+                            Spacer()
+                            Text("Add Goal")
+                                .fontWeight(.bold)
+                            Spacer()
+                        }
+                    }
                     .disabled(title.isEmpty)
+                    .tint(settings.currentTheme.accentColor)
                 }
             }
             .navigationTitle("New \(selectedType.rawValue) Goal")
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
                         presentationMode.wrappedValue.dismiss()
                     }
@@ -3650,60 +5627,435 @@ struct AddGoalView: View {
             }
         }
     }
+    
+    private func addGoal() {
+        let goal = GoalsStore.Goal(
+            type: selectedType,
+            title: title,
+            description: description,
+            isCompleted: progress >= 1.0,
+            targetDate: targetDate,
+            progress: progress
+        )
+        goalsStore.addGoal(goal)
+        presentationMode.wrappedValue.dismiss()
+    }
+}
+
+struct SearchBar: View {
+    @Binding var text: String
+    var placeholder: String
+    
+    var body: some View {
+        HStack {
+            TextField(placeholder, text: $text)
+                .padding(8)
+                .padding(.horizontal, 24)
+                .background(Color(.systemGray6))
+                .cornerRadius(8)
+                .overlay(
+                    HStack {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(.gray)
+                            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+                            .padding(.leading, 8)
+                        
+                        if !text.isEmpty {
+                            Button(action: { text = "" }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(.gray)
+                                    .padding(.trailing, 8)
+                            }
+                        }
+                    }
+                )
+        }
+        .padding(.horizontal)
+    }
 }
 
 // MARK: - Settings View
 struct SettingsView: View {
     @EnvironmentObject var settings: SettingsStore
+    @State private var showingThemeEditor = false
+    @State private var showingNotificationSettings = false
+    @State private var showingDataOptions = false
     
     var body: some View {
         NavigationView {
-            ZStack {
-                settings.currentTheme.backgroundColor
-                    .edgesIgnoringSafeArea(.all)
-                
-                Form {
-                    Section(header: Text("Appearance").foregroundColor(settings.currentTheme.accentColor)) {
-                        Picker("Theme", selection: $settings.currentTheme) {
-                            ForEach(AppTheme.allCases) { theme in
-                                Text(theme.rawValue.capitalized).tag(theme)
-                                    .foregroundColor(settings.currentTheme.textColor)
-                            }
+            List {
+                // Appearance Section
+                Section(header: Text("Appearance").foregroundColor(settings.currentTheme.textColor)) {
+                    NavigationLink(destination: ThemeEditorView()) {
+                        HStack {
+                            Image(systemName: "paintpalette")
+                                .foregroundColor(settings.currentTheme.accentColor)
+                            Text("Theme Settings")
+                            Spacer()
+                            Circle()
+                                .fill(settings.currentTheme.accentColor)
+                                .frame(width: 20, height: 20)
                         }
-                        .pickerStyle(SegmentedPickerStyle())
-                        .colorMultiply(settings.currentTheme.primaryColor)
                     }
-                    .listRowBackground(settings.currentTheme.backgroundColor.opacity(0.8))
                     
-                    Section(header: Text("About").foregroundColor(settings.currentTheme.accentColor)) {
-                        HStack {
-                            Text("Version")
-                                .foregroundColor(settings.currentTheme.textColor)
-                            Spacer()
-                            Text("1.0.0")
-                                .foregroundColor(settings.currentTheme.textColor.opacity(0.7))
-                        }
-                        
-                        HStack {
-                            Text("Build")
-                                .foregroundColor(settings.currentTheme.textColor)
-                            Spacer()
-                            Text("100")
-                                .foregroundColor(settings.currentTheme.textColor.opacity(0.7))
+                    Picker("Water Unit", selection: $settings.waterUnit) {
+                        ForEach(SettingsStore.WaterUnit.allCases, id: \.self) { unit in
+                            Text(unit.rawValue).tag(unit)
                         }
                     }
-                    .listRowBackground(settings.currentTheme.backgroundColor.opacity(0.8))
+                    .pickerStyle(.menu)
                 }
-                .scrollContentBackground(.hidden) // This hides the default white background
-                .background(settings.currentTheme.backgroundColor)
+                .listRowBackground(settings.currentTheme.backgroundColor.opacity(0.2))
+                
+                // Notifications Section
+                Section(header: Text("Notifications").foregroundColor(settings.currentTheme.textColor)) {
+                    NavigationLink(destination: NotificationSettingsView()) {
+                        HStack {
+                            Image(systemName: "bell")
+                                .foregroundColor(settings.currentTheme.accentColor)
+                            Text("Notification Preferences")
+                        }
+                    }
+                    
+                    Toggle(isOn: $settings.dailyReminders) {
+                        HStack {
+                            Image(systemName: "calendar")
+                                .foregroundColor(settings.currentTheme.accentColor)
+                            Text("Daily Reminders")
+                        }
+                    }
+                }
+                .listRowBackground(settings.currentTheme.backgroundColor.opacity(0.2))
+                
+                // Data Section
+                Section(header: Text("Data").foregroundColor(settings.currentTheme.textColor)) {
+                    NavigationLink(destination: DataManagementView()) {
+                        HStack {
+                            Image(systemName: "externaldrive")
+                                .foregroundColor(settings.currentTheme.accentColor)
+                            Text("Data Management")
+                        }
+                    }
+                    
+                    Button {
+                        settings.exportAllData()
+                    } label: {
+                        HStack {
+                            Image(systemName: "square.and.arrow.up")
+                                .foregroundColor(settings.currentTheme.accentColor)
+                            Text("Export All Data")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.gray)
+                        }
+                    }
+                    
+                    Button(role: .destructive) {
+                        showingDataOptions = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "trash")
+                                .foregroundColor(.red)
+                            Text("Reset All Data")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.gray)
+                        }
+                    }
+                }
+                .listRowBackground(settings.currentTheme.backgroundColor.opacity(0.2))
+                
+                // About Section
+                Section(header: Text("About").foregroundColor(settings.currentTheme.textColor)) {
+                    HStack {
+                        Image(systemName: "info.circle")
+                            .foregroundColor(settings.currentTheme.accentColor)
+                        Text("Version")
+                        Spacer()
+                        Text("1.2.0")
+                            .foregroundColor(settings.currentTheme.textColor.opacity(0.7))
+                    }
+                    
+                    HStack {
+                        Image(systemName: "number")
+                            .foregroundColor(settings.currentTheme.accentColor)
+                        Text("Build Number")
+                        Spacer()
+                        Text("210")
+                            .foregroundColor(settings.currentTheme.textColor.opacity(0.7))
+                    }
+                    
+                    Link(destination: URL(string: "https://yourapp.com/terms")!) {
+                        HStack {
+                            Image(systemName: "doc.text")
+                                .foregroundColor(settings.currentTheme.accentColor)
+                            Text("Terms of Service")
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .foregroundColor(.gray)
+                        }
+                    }
+                    
+                    Link(destination: URL(string: "https://yourapp.com/privacy")!) {
+                        HStack {
+                            Image(systemName: "hand.raised")
+                                .foregroundColor(settings.currentTheme.accentColor)
+                            Text("Privacy Policy")
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .foregroundColor(.gray)
+                        }
+                    }
+                }
+                .listRowBackground(settings.currentTheme.backgroundColor.opacity(0.2))
             }
             .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.inline)
+            .confirmationDialog("Reset All Data", isPresented: $showingDataOptions, titleVisibility: .visible) {
+                Button("Reset Settings Only", role: .destructive) {
+                    settings.resetSettings()
+                }
+                Button("Reset All Data", role: .destructive) {
+                    settings.resetAllData()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This cannot be undone. All your data will be permanently deleted.")
+            }
+        }
+    }
+}
+
+// Theme Editor View
+struct ThemeEditorView: View {
+    @EnvironmentObject var settings: SettingsStore
+    
+    var body: some View {
+        Form {
+            Section(header: Text("Select Theme").foregroundColor(settings.currentTheme.textColor)) {
+                Picker("App Theme", selection: $settings.currentTheme) {
+                    ForEach(AppTheme.allCases) { theme in
+                        Text(theme.rawValue.capitalized).tag(theme)
+                    }
+                }
+                .pickerStyle(.inline)
+            }
+            
+            Section(header: Text("Preview").foregroundColor(settings.currentTheme.textColor)) {
+                VStack(spacing: 20) {
+                    Text("Sample Text")
+                        .foregroundColor(settings.currentTheme.textColor)
+                    
+                    Button("Sample Button") {}
+                        .buttonStyle(.borderedProminent)
+                        .tint(settings.currentTheme.accentColor)
+                    
+                    HStack {
+                        Circle()
+                            .fill(settings.currentTheme.primaryColor)
+                            .frame(width: 30, height: 30)
+                        Circle()
+                            .fill(settings.currentTheme.secondaryColor)
+                            .frame(width: 30, height: 30)
+                        Circle()
+                            .fill(settings.currentTheme.backgroundColor)
+                            .frame(width: 30, height: 30)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(settings.currentTheme.backgroundColor.opacity(0.2))
+                .cornerRadius(10)
+            }
+        }
+        .navigationTitle("Theme Settings")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+// Notification Settings View
+struct NotificationSettingsView: View {
+    @EnvironmentObject var settings: SettingsStore
+    
+    var body: some View {
+        Form {
+            Section(header: Text("General").foregroundColor(settings.currentTheme.textColor)) {
+                Toggle(isOn: $settings.notificationsEnabled) {
+                    Text("Enable Notifications")
+                }
+                
+                if settings.notificationsEnabled {
+                    DatePicker("Daily Reminder Time",
+                               selection: $settings.dailyReminderTime,
+                               displayedComponents: .hourAndMinute)
+                }
+            }
+            
+            Section(header: Text("Notification Types").foregroundColor(settings.currentTheme.textColor)) {
+                Toggle(isOn: $settings.taskReminders) {
+                    Text("Task Reminders")
+                }
+                
+                Toggle(isOn: $settings.goalReminders) {
+                    Text("Goal Reminders")
+                }
+                
+                Toggle(isOn: $settings.healthReminders) {
+                    Text("Health Reminders")
+                }
+            }
+        }
+        .navigationTitle("Notifications")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+// Data Management View
+struct DataManagementView: View {
+    @EnvironmentObject var settings: SettingsStore
+    
+    var body: some View {
+        Form {
+            Section(header: Text("Backup").foregroundColor(settings.currentTheme.textColor)) {
+                Button {
+                    settings.exportAllData()
+                } label: {
+                    HStack {
+                        Image(systemName: "square.and.arrow.up")
+                            .foregroundColor(settings.currentTheme.accentColor)
+                        Text("Export All Data")
+                    }
+                }
+                
+                Button {
+                    settings.importData()
+                } label: {
+                    HStack {
+                        Image(systemName: "square.and.arrow.down")
+                            .foregroundColor(settings.currentTheme.accentColor)
+                        Text("Import Data")
+                    }
+                }
+            }
+            
+            Section(header: Text("Advanced").foregroundColor(settings.currentTheme.textColor)) {
+                NavigationLink(destination: DataResetView()) {
+                    HStack {
+                        Image(systemName: "trash")
+                            .foregroundColor(.red)
+                        Text("Reset Options")
+                    }
+                }
+            }
+        }
+        .navigationTitle("Data Management")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+// Data Reset View
+struct DataResetView: View {
+    @EnvironmentObject var settings: SettingsStore
+    @State private var showingResetConfirmation = false
+    
+    var body: some View {
+        Form {
+            Section {
+                Button(role: .destructive) {
+                    showingResetConfirmation = true
+                } label: {
+                    HStack {
+                        Image(systemName: "trash")
+                        Text("Reset All Data")
+                    }
+                }
+            }
+        }
+        .navigationTitle("Reset Options")
+        .confirmationDialog("Reset All Data", isPresented: $showingResetConfirmation, titleVisibility: .visible) {
+            Button("Reset Settings Only", role: .destructive) {
+                settings.resetSettings()
+            }
+            Button("Reset All Data", role: .destructive) {
+                settings.resetAllData()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This cannot be undone. All your data will be permanently deleted.")
         }
     }
 }
 
 // MARK: - Helper Extensions
+extension SettingsStore {
+    var notificationsEnabled: Bool {
+        get { UserDefaults.standard.bool(forKey: "notificationsEnabled") }
+        set { UserDefaults.standard.set(newValue, forKey: "notificationsEnabled") }
+    }
+    
+    var dailyReminders: Bool {
+        get { UserDefaults.standard.bool(forKey: "dailyReminders") }
+        set { UserDefaults.standard.set(newValue, forKey: "dailyReminders") }
+    }
+    
+    var dailyReminderTime: Date {
+        get {
+            UserDefaults.standard.object(forKey: "dailyReminderTime") as? Date ?? Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date()
+        }
+        set { UserDefaults.standard.set(newValue, forKey: "dailyReminderTime") }
+    }
+    
+    var taskReminders: Bool {
+        get { UserDefaults.standard.bool(forKey: "taskReminders") }
+        set { UserDefaults.standard.set(newValue, forKey: "taskReminders") }
+    }
+    
+    var goalReminders: Bool {
+        get { UserDefaults.standard.bool(forKey: "goalReminders") }
+        set { UserDefaults.standard.set(newValue, forKey: "goalReminders") }
+    }
+    
+    var healthReminders: Bool {
+        get { UserDefaults.standard.bool(forKey: "healthReminders") }
+        set { UserDefaults.standard.set(newValue, forKey: "healthReminders") }
+    }
+    
+    func exportAllData() {
+        // Implementation for exporting data
+        print("Exporting all data...")
+    }
+    
+    func importData() {
+        // Implementation for importing data
+        print("Importing data...")
+    }
+    
+    func resetSettings() {
+        UserDefaults.standard.removeObject(forKey: "appTheme")
+        UserDefaults.standard.removeObject(forKey: "waterUnitPreference")
+        UserDefaults.standard.removeObject(forKey: "notificationsEnabled")
+        UserDefaults.standard.removeObject(forKey: "dailyReminders")
+        UserDefaults.standard.removeObject(forKey: "dailyReminderTime")
+        UserDefaults.standard.removeObject(forKey: "taskReminders")
+        UserDefaults.standard.removeObject(forKey: "goalReminders")
+        UserDefaults.standard.removeObject(forKey: "healthReminders")
+        
+        // Reset to default values
+        currentTheme = .light
+        waterUnit = .liters
+    }
+    
+    func resetAllData() {
+        resetSettings()
+        // Add additional data clearing here
+        UserDefaults.standard.removeObject(forKey: "tasks")
+        UserDefaults.standard.removeObject(forKey: "goals")
+        UserDefaults.standard.removeObject(forKey: "healthRecords")
+        UserDefaults.standard.removeObject(forKey: "incomeRecords")
+        UserDefaults.standard.removeObject(forKey: "expenses")
+    }
+}
+
+
 extension Calendar {
     func generateDates(for dateInterval: DateInterval, matching components: DateComponents) -> [Date] {
         var dates = [dateInterval.start]
@@ -3786,11 +6138,47 @@ extension View {
 }
 
 extension Double {
-    func litersToOunces() -> Double {
-        return self * 33.814
+    func converted(to unit: SettingsStore.WaterUnit) -> Double {
+        switch unit {
+        case .liters: return self
+        case .ounces: return self * 33.814
+        }
+    }
+}
+
+extension Date {
+    var startOfWeek: Date {
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: self)
+        return calendar.date(from: components) ?? self
     }
     
-    func ouncesToLiters() -> Double {
-        return self / 33.814
+    var endOfWeek: Date {
+        let calendar = Calendar.current
+        return calendar.date(byAdding: .day, value: 6, to: self.startOfWeek) ?? self
+    }
+}
+
+extension GoalsStore {
+    func updateGoal(_ goal: Goal) {
+        if let index = goals.firstIndex(where: { $0.id == goal.id }) {
+            goals[index] = goal
+            saveGoals()
+        }
+    }
+    
+    func deleteGoal(_ goal: Goal) {
+        if let index = goals.firstIndex(where: { $0.id == goal.id }) {
+            goals.remove(at: index)
+            saveGoals()
+        }
+    }
+    
+    func toggleGoalCompletion(_ goal: Goal) {
+        if let index = goals.firstIndex(where: { $0.id == goal.id }) {
+            goals[index].isCompleted.toggle()
+            goals[index].progress = goals[index].isCompleted ? 1.0 : max(0, goals[index].progress - 0.1)
+            saveGoals()
+        }
     }
 }

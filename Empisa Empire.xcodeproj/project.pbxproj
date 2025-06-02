@@ -24,6 +24,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		3B5E13BB2DEC77950077C50A /* Empisa-Empire-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Empisa-Empire-Info.plist"; sourceTree = "<group>"; };
 		3BE4E6B52DC15DCA00232994 /* Empisa Empire.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Empisa Empire.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		3BE4E6C22DC15DD000232994 /* Empisa EmpireTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Empisa EmpireTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		3BE4E6CC2DC15DD000232994 /* Empisa EmpireUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Empisa EmpireUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -75,6 +76,7 @@
 		3BE4E6AC2DC15DCA00232994 = {
 			isa = PBXGroup;
 			children = (
+				3B5E13BB2DEC77950077C50A /* Empisa-Empire-Info.plist */,
 				3BE4E6B72DC15DCA00232994 /* Habit Builder */,
 				3BE4E6C52DC15DD000232994 /* Habit BuilderTests */,
 				3BE4E6CF2DC15DD000232994 /* Habit BuilderUITests */,
@@ -398,6 +400,7 @@
 				DEVELOPMENT_TEAM = 5W4B9A65LA;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Empisa-Empire-Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -427,6 +430,7 @@
 				DEVELOPMENT_TEAM = 5W4B9A65LA;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Empisa-Empire-Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
