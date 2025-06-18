@@ -7,10 +7,12 @@ struct EmpireApp: App {
     @StateObject private var incomeStore = IncomeStore()
     @StateObject private var healthStore = HealthStore()
     @StateObject private var statusStore = StatusStore()
+    @StateObject private var historyStore = HistoryStore()
     
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(historyStore)
                 .environmentObject(settingsStore)
                 .environmentObject(taskStore)
                 .environmentObject(incomeStore)
