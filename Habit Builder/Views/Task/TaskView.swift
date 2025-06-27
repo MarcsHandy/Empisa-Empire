@@ -57,9 +57,7 @@ struct TaskView: View {
                                 },
                                 onEdit: {
                                     taskToEdit = task
-                                    showingEditTask = true
-                                }
-                            )
+                                }                            )
                             .padding(.horizontal)
                         }
                     }
@@ -82,19 +80,15 @@ struct TaskView: View {
                 AddTaskView(taskStore: taskStore, selectedDate: $selectedDate)
                     .environmentObject(settings)
             }
-            .sheet(isPresented: $showingEditTask) {
-                if let taskToEdit = taskToEdit {
-                    EditTaskView(taskStore: taskStore, task: taskToEdit)
-                        .environmentObject(settings)
-                }
+            .sheet(item: $taskToEdit) { task in
+                EditTaskView(taskStore: taskStore, task: task)
+                    .environmentObject(settings)
             }
         }
     }
-
     
     private var filteredTasks: [Task] {
-        taskStore.tasksForDate(selectedDate)
-            .sorted { $0.startDate < $1.startDate }
+        taskStore.tasksForDate(selectedDate) // Sorting is already handled in tasksForDate
     }
     
     private func deleteTask(_ task: Task) {

@@ -26,24 +26,32 @@ struct HealthView: View {
     
     // Computed properties for water display
     private var waterDisplayValue: String {
-        String(format: "%.1f %@", todaysRecord.waterIntake.converted(to: settings.waterUnit), settings.waterUnit.rawValue)
+        let convertedValue = settings.waterUnit == .liters ?
+            todaysRecord.waterIntake :
+            todaysRecord.waterIntake * 33.814
+        return String(format: "%.1f %@", convertedValue, settings.waterUnit.rawValue)
     }
-    
+
     private var waterDisplayGoal: String {
         let baseGoal = 2.5 // 2.5 liters is the base goal
-        let convertedGoal = baseGoal * settings.waterUnit.conversionFactor
+        let convertedGoal = settings.waterUnit == .liters ?
+            baseGoal :
+            baseGoal * 33.814
         return String(format: "%.1f %@", convertedGoal, settings.waterUnit.rawValue)
     }
-    
+
     private var waterProgress: Double {
         let baseGoal = 2.5
         return todaysRecord.waterIntake / baseGoal
     }
-    
+
     private var avgWaterDisplayValue: String {
-        String(format: "%.1f %@", weeklyAverages.water.converted(to: settings.waterUnit), settings.waterUnit.rawValue)
+        let convertedValue = settings.waterUnit == .liters ?
+            weeklyAverages.water :
+            weeklyAverages.water * 33.814
+        return String(format: "%.1f %@", convertedValue, settings.waterUnit.rawValue)
     }
-        
+    
     var body: some View {
         NavigationView {
             ZStack {
@@ -76,6 +84,16 @@ struct HealthView: View {
                                     progress: waterProgress,
                                     color: .blue
                                 )
+                                .onTapGesture {
+                                    showingEditWater = true
+                                    tempWaterValue = String(format: "%.1f", healthStore.todaysRecord().waterIntake)
+                                }
+                                .healthMetricCardEditModifier(
+                                    isPresented: $showingEditWater,
+                                    title: "Water Intake",
+                                    value: $tempWaterValue,
+                                    healthStore: healthStore
+                                )
                                 
                                 HealthMetricCard(
                                     title: "Sleep",
@@ -83,6 +101,16 @@ struct HealthView: View {
                                     goal: "8 hrs",
                                     progress: todaysRecord.sleepHours / 8,
                                     color: .purple
+                                )
+                                .onTapGesture {
+                                    showingEditSleep = true
+                                    tempSleepValue = String(format: "%.1f", healthStore.todaysRecord().sleepHours)
+                                }
+                                .healthMetricCardEditModifier(
+                                    isPresented: $showingEditSleep,
+                                    title: "Sleep Hours",
+                                    value: $tempSleepValue,
+                                    healthStore: healthStore
                                 )
                             }
                             .padding(.horizontal)
@@ -98,22 +126,23 @@ struct HealthView: View {
                             }
                             .padding(.horizontal)
                             
-                            HealthMetricCard(
-                                title: "Calories",
-                                value: "\(healthStore.todaysRecord().caloriesConsumed)",
-                                goal: "2000 kcal",
-                                progress: Double(healthStore.todaysRecord().caloriesConsumed) / 2000,
-                                color: .orange
-                            )
-                            .healthMetricCardEditModifier(
-                                isPresented: $showingEditCalories,
-                                title: "Calories Consumed",
-                                value: $tempCaloriesValue,
-                                healthStore: healthStore
-                            )
-                            .onAppear {
-                                tempCaloriesValue = "\(healthStore.todaysRecord().caloriesConsumed)"
-                            }
+                        HealthMetricCard(
+                            title: "Calories",
+                            value: "\(healthStore.todaysRecord().caloriesConsumed)",
+                            goal: "2000 kcal",
+                            progress: Double(healthStore.todaysRecord().caloriesConsumed) / 2000,
+                            color: .orange
+                        )
+                        .onTapGesture {
+                            showingEditCalories = true
+                            tempCaloriesValue = "\(healthStore.todaysRecord().caloriesConsumed)"
+                        }
+                        .healthMetricCardEditModifier(
+                            isPresented: $showingEditCalories,
+                            title: "Calories Consumed",
+                            value: $tempCaloriesValue,
+                            healthStore: healthStore
+                        )
                             .padding(.horizontal)
                         }
                         
@@ -322,7 +351,9 @@ struct EditSingleHealthView: View {
         )
         
         if title.contains("Water") {
-            record.waterIntake = newValue
+            // Convert to liters if the input was in another unit
+            let settings = SettingsStore()
+            record.waterIntake = settings.waterUnit == .liters ? newValue : newValue / 33.814
         } else if title.contains("Sleep") {
             record.sleepHours = newValue
         } else {
