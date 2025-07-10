@@ -11,8 +11,83 @@ class TaskStore: ObservableObject {
     }
     
     func addTask(_ task: Task) {
-        tasks.append(task)
+        if let index = tasks.firstIndex(where: { $0.startDate > task.startDate }) {
+            tasks.insert(task, at: index)
+        } else {
+            tasks.append(task)
+        }
         saveTasks()
+    }
+    
+    func tasksForDate(_ date: Date) -> [Task] {
+        let calendar = Calendar.current
+        let requestedDay = calendar.component(.day, from: date)
+        let requestedMonth = calendar.component(.month, from: date)
+        let requestedWeekday = calendar.component(.weekday, from: date)
+
+        var tasksForThisDate: [Task] = []
+
+        for task in tasks {
+            // If the task occurs exactly on this date
+            if calendar.isDate(task.startDate, inSameDayAs: date) {
+                tasksForThisDate.append(task)
+                continue
+            }
+
+            // Handle recurrence
+            guard let recurrence = task.recurrence, date > task.startDate else { continue }
+
+            let taskDay = calendar.component(.day, from: task.startDate)
+            let taskMonth = calendar.component(.month, from: task.startDate)
+            let taskWeekday = calendar.component(.weekday, from: task.startDate)
+
+            var isRecurringToday = false
+
+            switch recurrence {
+            case .daily:
+                isRecurringToday = true
+            case .weekly:
+                if let recurrenceDays = task.recurrenceDays {
+                    isRecurringToday = recurrenceDays.contains(requestedWeekday)
+                } else {
+                    isRecurringToday = requestedWeekday == taskWeekday
+                }
+            case .monthly:
+                isRecurringToday = requestedDay == taskDay
+            case .yearly:
+                isRecurringToday = requestedDay == taskDay && requestedMonth == taskMonth
+            case .none:
+                break
+            }
+
+            if isRecurringToday {
+                // Create a copy of the task adjusted to this date
+                let timeInterval = task.endDate.timeIntervalSince(task.startDate)
+                let newStart = calendar.date(
+                    bySettingHour: calendar.component(.hour, from: task.startDate),
+                    minute: calendar.component(.minute, from: task.startDate),
+                    second: 0,
+                    of: date
+                ) ?? date
+                let newEnd = newStart.addingTimeInterval(timeInterval)
+
+                var recurringCopy = task
+                recurringCopy.startDate = newStart
+                recurringCopy.endDate = newEnd
+                tasksForThisDate.append(recurringCopy)
+            }
+        }
+
+        // Sort all tasks by startDate (now that recurring ones are adjusted)
+        return tasksForThisDate.sorted {
+            if $0.startDate != $1.startDate {
+                return $0.startDate < $1.startDate
+            }
+            return $0.endDate < $1.endDate
+        }
+    }
+    func hasTasksOnDate(_ date: Date) -> Bool {
+        return !tasksForDate(date).isEmpty
     }
     
     func tasksForWeek(containing date: Date) -> [Date: [Task]] {
@@ -64,7 +139,33 @@ class TaskStore: ObservableObject {
     private func loadTasks() {
         if let data = UserDefaults.standard.data(forKey: "tasks"),
            let decoded = try? JSONDecoder().decode([Task].self, from: data) {
-            tasks = decoded
+            tasks = decoded.sorted {
+                if $0.startDate != $1.startDate {
+                    return $0.startDate < $1.startDate
+                }
+                return $0.endDate < $1.endDate
+            }
+        }
+    }
+    
+    func updateTask(_ updatedTask: Task) {
+        // Remove the old task if it exists
+        if let index = tasks.firstIndex(where: { $0.id == updatedTask.id }) {
+            tasks.remove(at: index)
+            
+            // Find the correct insertion point for the updated task
+            let insertionIndex: Int
+            if let firstLaterIndex = tasks.firstIndex(where: { $0.startDate > updatedTask.startDate }) {
+                insertionIndex = firstLaterIndex
+            } else {
+                insertionIndex = tasks.endIndex
+            }
+            
+            // Insert the updated task at the correct position
+            tasks.insert(updatedTask, at: insertionIndex)
+            
+            // Save changes
+            saveTasks()
         }
     }
 }

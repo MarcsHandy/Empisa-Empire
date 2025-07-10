@@ -366,62 +366,6 @@ struct CalendarTaskView: View {
     }
 }
 
-extension TaskStore {
-    func tasksForDate(_ date: Date) -> [Task] {
-        let calendar = Calendar.current
-        let requestedDay = calendar.component(.day, from: date)
-        let requestedMonth = calendar.component(.month, from: date)
-        let requestedWeekday = calendar.component(.weekday, from: date)
-        
-        return tasks.filter { task in
-            // Get components of the task's start date
-            let taskDay = calendar.component(.day, from: task.startDate)
-            let taskMonth = calendar.component(.month, from: task.startDate)
-            let taskWeekday = calendar.component(.weekday, from: task.startDate)
-            
-            // Check if it's the exact date
-            if calendar.isDate(task.startDate, inSameDayAs: date) {
-                return true
-            }
-            
-            // Check if this is a recurring task and the date is after the original task date
-            guard let recurrence = task.recurrence, date > task.startDate else {
-                return false
-            }
-            
-            switch recurrence {
-            case .daily:
-                return true
-            case .weekly:
-                if let recurrenceDays = task.recurrenceDays {
-                    return recurrenceDays.contains(requestedWeekday)
-                } else {
-                    // If no specific days set, use the original task's weekday
-                    return requestedWeekday == taskWeekday
-                }
-            case .monthly:
-                return requestedDay == taskDay
-            case .yearly:
-                return requestedDay == taskDay && requestedMonth == taskMonth
-            case .none:
-                return false
-            }
-        }
-        .sorted {
-            // First sort by start time
-            if $0.startDate != $1.startDate {
-                return $0.startDate < $1.startDate
-            }
-            // If start times are equal, sort by end time
-            return $0.endDate < $1.endDate
-        }
-    }
-    
-    func hasTasksOnDate(_ date: Date) -> Bool {
-        return !tasksForDate(date).isEmpty
-    }
-}
-
 // TaskRow.swift
 struct TaskRow: View {
     @EnvironmentObject var settings: SettingsStore
@@ -734,6 +678,7 @@ struct EditTaskView: View {
             
             taskStore.tasks[index] = updatedTask
             taskStore.saveTasks()
+            taskStore.updateTask(updatedTask)
             presentationMode.wrappedValue.dismiss()
         }
     }
