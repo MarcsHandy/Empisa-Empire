@@ -1,9 +1,16 @@
 import SwiftUI
-import AVFoundation
 import Foundation
 
 class ExpenseStore: ObservableObject {
-    @Published var expenses: [Expense] = []
+    @Published var expenses: [Expense] = [] {
+        didSet {
+            saveExpenses()
+        }
+    }
+    
+    private var lastRecurringCheck: Date = Date.distantPast
+    private let maxExpenses = 10_000
+    private let calendar = Calendar.current
     
     init() {
         loadExpenses()
@@ -11,35 +18,35 @@ class ExpenseStore: ObservableObject {
     }
     
     func addExpense(_ expense: Expense) {
+        guard expenses.count < maxExpenses else { return }
         expenses.append(expense)
-        saveExpenses()
     }
     
     func deleteExpense(_ expense: Expense) {
         if let index = expenses.firstIndex(where: { $0.id == expense.id }) {
             expenses.remove(at: index)
-            saveExpenses()
         }
     }
     
     func expensesForDate(_ date: Date) -> [Expense] {
-        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: date)
+        
         return expenses.filter { expense in
             if expense.isRecurring, let recurrence = expense.recurrence {
                 switch recurrence {
                 case .daily:
                     return true
                 case .weekly:
-                    return calendar.component(.weekday, from: date) == calendar.component(.weekday, from: expense.date)
+                    return calendar.component(.weekday, from: startOfDay) == calendar.component(.weekday, from: expense.date)
                 case .monthly:
-                    return calendar.component(.day, from: date) == calendar.component(.day, from: expense.date)
+                    return calendar.component(.day, from: startOfDay) == calendar.component(.day, from: expense.date)
                 case .yearly:
                     let expenseComponents = calendar.dateComponents([.month, .day], from: expense.date)
-                    let dateComponents = calendar.dateComponents([.month, .day], from: date)
-                    return expenseComponents.month == dateComponents.month && expenseComponents.day == dateComponents.day
+                    let dateComponents = calendar.dateComponents([.month, .day], from: startOfDay)
+                    return expenseComponents == dateComponents
                 }
             } else {
-                return calendar.isDate(expense.date, inSameDayAs: date)
+                return calendar.isDate(expense.date, inSameDayAs: startOfDay)
             }
         }
     }
@@ -49,7 +56,6 @@ class ExpenseStore: ObservableObject {
     }
     
     func weeklyTotal() -> Double {
-        let calendar = Calendar.current
         let currentWeek = calendar.component(.weekOfYear, from: Date())
         return expenses.filter {
             calendar.component(.weekOfYear, from: $0.date) == currentWeek ||
@@ -58,7 +64,6 @@ class ExpenseStore: ObservableObject {
     }
     
     func monthlyTotal() -> Double {
-        let calendar = Calendar.current
         let currentMonth = calendar.component(.month, from: Date())
         return expenses.filter {
             calendar.component(.month, from: $0.date) == currentMonth ||
@@ -67,22 +72,31 @@ class ExpenseStore: ObservableObject {
     }
     
     private func checkRecurringExpenses() {
-        let today = Calendar.current.startOfDay(for: Date())
-        for expense in expenses where expense.isRecurring {
-            if !expensesForDate(today).contains(where: { $0.id == expense.id }) {
-                let newExpense = Expense(
-                    id: UUID(),
-                    title: expense.title,
-                    amount: expense.amount,
-                    date: today,
-                    category: expense.category,
-                    isRecurring: true,
-                    recurrence: expense.recurrence
-                )
-                expenses.append(newExpense)
-            }
+        let now = Date()
+        guard now.timeIntervalSince(lastRecurringCheck) > 86400 else { return }
+        lastRecurringCheck = now
+        
+        let today = calendar.startOfDay(for: now)
+        let todayExpenses = expenses.filter { calendar.isDate($0.date, inSameDayAs: today) }
+        
+        let recurringToAdd = expenses.filter { expense in
+            expense.isRecurring &&
+            !todayExpenses.contains(where: { $0.id == expense.id })
         }
-        saveExpenses()
+        
+        let newExpenses = recurringToAdd.map { expense in
+            Expense(
+                id: UUID(),
+                title: expense.title,
+                amount: expense.amount,
+                date: today,
+                category: expense.category,
+                isRecurring: true,
+                recurrence: expense.recurrence
+            )
+        }
+        
+        expenses.append(contentsOf: newExpenses)
     }
     
     private func saveExpenses() {
