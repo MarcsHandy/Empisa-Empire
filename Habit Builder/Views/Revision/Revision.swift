@@ -2,8 +2,7 @@ import SwiftUI
 import AVFoundation
 import Foundation
 
-struct RevisionView: View {
-    @EnvironmentObject var settings: SettingsStore
+struct RevisionView: View {    @EnvironmentObject var settings: SettingsStore
     @StateObject private var revisionStore = RevisionStore()
     @State private var showingAddRevision = false
     @State private var showingWeeklyRetrospective = false
@@ -43,6 +42,7 @@ struct RevisionView: View {
                 )
             }
         }
+        .navigationViewStyle(.stack)
     }
     
     private var todaysSummaryCard: some View {

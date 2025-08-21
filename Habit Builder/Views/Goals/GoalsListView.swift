@@ -1,6 +1,4 @@
 import SwiftUI
-import AVFoundation
-import Foundation
 
 struct GoalListView: View {
     @EnvironmentObject var settings: SettingsStore

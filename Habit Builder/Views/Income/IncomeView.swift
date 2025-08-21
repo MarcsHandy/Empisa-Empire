@@ -2,8 +2,7 @@ import SwiftUI
 import AVFoundation
 import Foundation
 
-struct IncomeView: View {
-    @EnvironmentObject var settings: SettingsStore
+struct IncomeView: View {    @EnvironmentObject var settings: SettingsStore
     @ObservedObject var incomeStore: IncomeStore
     @ObservedObject var expenseStore: ExpenseStore
     @State private var showingAddIncome = false
@@ -14,155 +13,193 @@ struct IncomeView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                settings.currentTheme.backgroundColor
-                    .edgesIgnoringSafeArea(.all)
-                
-                ScrollView {
-                    VStack(spacing: 20) {
-                        // Summary Cards
-                        VStack(spacing: 16) {
-                            
-                            // Calendar View
-                            CalendarView(incomeStore: incomeStore)
-                                .frame(height: 300)
-                                .padding(.horizontal)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(settings.currentTheme.backgroundColor == .black ? Color.gray.opacity(0.2) :
-                                              settings.currentTheme.backgroundColor == .darkPurple ? Color.neonBlue.opacity(0.1) :
-                                              Color.white)
-                                        .shadow(color: settings.currentTheme.textColor.opacity(0.1), radius: 5)
-                                )
-                                .padding(.horizontal)
-                            
-                            // Income Cards
-                            HStack(spacing: 16) {
-                                SummaryCard(
-                                    title: "Income Today",
-                                    amount: incomeStore.todayTotal(),
-                                    color: settings.currentTheme.accentColor
-                                )
-                                SummaryCard(
-                                    title: "Income Week",
-                                    amount: incomeStore.weeklyTotal(),
-                                    color: settings.currentTheme.primaryColor
-                                )
-                                SummaryCard(
-                                    title: "Income Month",
-                                    amount: incomeStore.monthlyTotal(),
-                                    color: settings.currentTheme.secondaryColor
-                                )
-                            }
-                            
-                            // Expense Cards
-                            HStack(spacing: 16) {
-                                SummaryCard(
-                                    title: "Expenses Today",
-                                    amount: expenseStore.todayTotal(),
-                                    color: Color.red
-                                )
-                                SummaryCard(
-                                    title: "Expenses Week",
-                                    amount: expenseStore.weeklyTotal(),
-                                    color: Color.orange
-                                )
-                                SummaryCard(
-                                    title: "Expenses Month",
-                                    amount: expenseStore.monthlyTotal(),
-                                    color: Color.yellow
-                                )
-                            }
-                            
-                            // Net Cards
-                            HStack(spacing: 16) {
-                                SummaryCard(
-                                    title: "Net Today",
-                                    amount: incomeStore.todayTotal() - expenseStore.todayTotal(),
-                                    color: incomeStore.todayTotal() - expenseStore.todayTotal() >= 0 ? Color.green : Color.red
-                                )
-                                SummaryCard(
-                                    title: "Net Week",
-                                    amount: incomeStore.weeklyTotal() - expenseStore.weeklyTotal(),
-                                    color: incomeStore.weeklyTotal() - expenseStore.weeklyTotal() >= 0 ? Color.green : Color.red
-                                )
-                                SummaryCard(
-                                    title: "Net Month",
-                                    amount: incomeStore.monthlyTotal() - expenseStore.monthlyTotal(),
-                                    color: incomeStore.monthlyTotal() - expenseStore.monthlyTotal() >= 0 ? Color.green : Color.red
-                                )
-                            }
-                        }
-                        .padding(.horizontal)
-                        
-                        // Add Expense Button
-                        Button(action: {
-                            showingAddExpense = true
-                        }) {
-                            HStack {
-                                Image(systemName: "minus.circle.fill")
-                                Text("Add Expense")
-                            }
-                            .foregroundColor(.white)
-                            .padding()
-                            .frame(maxWidth: .infinity)
-                            .background(Color.red)
-                            .cornerRadius(10)
-                        }
-                        .padding(.horizontal)
-                        
-                        // Recent Transactions
-                        VStack(spacing: 16) {
-                            Text("Recent Transactions")
-                                .font(.title2.bold())
-                                .foregroundColor(settings.currentTheme.textColor)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal)
-                            
-                            // Recent Income
-                            ForEach(incomeStore.records.sorted(by: { $0.date > $1.date }).prefix(3)) { record in
-                                TransactionRow(
-                                    title: "Income",
-                                    amount: record.amount,
-                                    date: record.date,
-                                    isIncome: true
-                                )
-                            }
-                            
-                            // Recent Expenses
-                            ForEach(expenseStore.expenses.sorted(by: { $0.date > $1.date }).prefix(3)) { expense in
-                                TransactionRow(
-                                    title: expense.title,
-                                    amount: -expense.amount,
-                                    date: expense.date,
-                                    isIncome: false,
-                                    category: expense.category.rawValue
-                                )
-                            }
-                        }
-                        .padding(.horizontal)
-                    }
-                    .padding(.vertical)
-                }
-                .navigationTitle("Income & Expenses")
-                .toolbar {
-                    ToolbarItemGroup(placement: .navigationBarTrailing) {
-                        Button(action: { showingAddIncome = true }) {
-                            Image(systemName: "plus")
-                                .foregroundColor(settings.currentTheme.accentColor)
-                        }
-                    }
-                }
-                .sheet(isPresented: $showingAddIncome) {
-                    AddIncomeView(incomeStore: incomeStore)
-                }
-                .sheet(isPresented: $showingAddExpense) {
-                    AddExpenseView(expenseStore: expenseStore)
-                }
-                .sheet(isPresented: $showingEditIncome) {
-                    if let incomeToEdit = incomeToEdit {
-                        EditIncomeView(incomeStore: incomeStore, record: incomeToEdit)
-                    }
-                }
+                backgroundColor
+                contentView
+            }
+        }
+        .navigationViewStyle(.stack)
+    }
+
+    private var backgroundColor: some View {
+        settings.currentTheme.backgroundColor
+            .edgesIgnoringSafeArea(.all)
+    }
+
+    private var contentView: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                summaryCards
+                addExpenseButton
+                recentTransactions
+            }
+            .padding(.vertical)
+        }
+        .navigationTitle("Income & Expenses")
+        .toolbar { toolbarContent }
+        .sheet(isPresented: $showingAddIncome) {
+            AddIncomeView(incomeStore: incomeStore)
+        }
+        .sheet(isPresented: $showingAddExpense) {
+            AddExpenseView(expenseStore: expenseStore)
+        }
+        .sheet(isPresented: $showingEditIncome) {
+            if let incomeToEdit = incomeToEdit {
+                EditIncomeView(incomeStore: incomeStore, record: incomeToEdit)
+            }
+        }
+    }
+
+    // MARK: - Subviews
+
+    private var summaryCards: some View {
+        VStack(spacing: 16) {
+            calendarSection
+            incomeCards
+            expenseCards
+            netCards
+        }
+        .padding(.horizontal)
+    }
+
+    private var calendarSection: some View {
+        CalendarView(incomeStore: incomeStore)
+            .frame(height: 300)
+            .padding(.horizontal)
+            .background(calendarBackground)
+            .padding(.horizontal)
+    }
+
+    private var calendarBackground: some View {
+        let backgroundColor: Color = {
+            switch settings.currentTheme.backgroundColor {
+            case .black: return .gray.opacity(0.2)
+            case .darkPurple: return .neonBlue.opacity(0.1)
+            default: return .white
+            }
+        }()
+        
+        return RoundedRectangle(cornerRadius: 12)
+            .fill(backgroundColor)
+            .shadow(color: settings.currentTheme.textColor.opacity(0.1), radius: 5)
+    }
+
+    private var incomeCards: some View {
+        HStack(spacing: 16) {
+            SummaryCard(
+                title: "Income Today",
+                amount: incomeStore.todayTotal(),
+                color: settings.currentTheme.accentColor
+            )
+            SummaryCard(
+                title: "Income Week",
+                amount: incomeStore.weeklyTotal(),
+                color: settings.currentTheme.primaryColor
+            )
+            SummaryCard(
+                title: "Income Month",
+                amount: incomeStore.monthlyTotal(),
+                color: settings.currentTheme.secondaryColor
+            )
+        }
+    }
+
+    private var expenseCards: some View {
+        HStack(spacing: 16) {
+            SummaryCard(
+                title: "Expenses Today",
+                amount: expenseStore.todayTotal,
+                color: Color.red
+            )
+            SummaryCard(
+                title: "Expenses Week",
+                amount: expenseStore.weeklyTotal,
+                color: Color.orange
+            )
+            SummaryCard(
+                title: "Expenses Month",
+                amount: expenseStore.monthlyTotal,
+                color: Color.yellow
+            )
+        }
+    }
+    
+    private var netCards: some View {
+        let todayNet = incomeStore.todayTotal() - expenseStore.todayTotal
+        let weeklyNet = incomeStore.weeklyTotal() - expenseStore.weeklyTotal
+        let monthlyNet = incomeStore.monthlyTotal() - expenseStore.monthlyTotal
+        
+        return HStack(spacing: 16) {
+            netCard(title: "Net Today", amount: todayNet)
+            netCard(title: "Net Week", amount: weeklyNet)
+            netCard(title: "Net Month", amount: monthlyNet)
+        }
+    }
+
+    private func netCard(title: String, amount: Double) -> some View {
+        SummaryCard(
+            title: title,
+            amount: amount,
+            color: amount >= 0 ? .green : .red
+        )
+    }
+
+    private var addExpenseButton: some View {
+        Button(action: { showingAddExpense = true }) {
+            HStack {
+                Image(systemName: "minus.circle.fill")
+                Text("Add Expense")
+            }
+            .foregroundColor(.white)
+            .padding()
+            .frame(maxWidth: .infinity)
+            .background(Color.red)
+            .cornerRadius(10)
+        }
+        .padding(.horizontal)
+    }
+
+    private var recentTransactions: some View {
+        VStack(spacing: 16) {
+            Text("Recent Transactions")
+                .font(.title2.bold())
+                .foregroundColor(settings.currentTheme.textColor)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal)
+            
+            recentIncome
+            recentExpenses
+        }
+        .padding(.horizontal)
+    }
+
+    private var recentIncome: some View {
+        ForEach(incomeStore.records.sorted(by: { $0.date > $1.date }).prefix(3)) { record in
+            TransactionRow(
+                title: "Income",
+                amount: record.amount,
+                date: record.date,
+                isIncome: true
+            )
+        }
+    }
+
+    private var recentExpenses: some View {
+        ForEach(expenseStore.expenses.sorted(by: { $0.date > $1.date }).prefix(3)) { expense in
+            TransactionRow(
+                title: expense.title,
+                amount: -expense.amount,
+                date: expense.date,
+                isIncome: false,
+                category: expense.category.rawValue
+            )
+        }
+    }
+
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItemGroup(placement: .navigationBarTrailing) {
+            Button(action: { showingAddIncome = true }) {
+                Image(systemName: "plus")
+                    .foregroundColor(settings.currentTheme.accentColor)
             }
         }
     }

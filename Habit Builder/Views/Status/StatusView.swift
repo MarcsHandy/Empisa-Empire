@@ -1,6 +1,4 @@
 import SwiftUI
-import AVFoundation
-import Foundation
 
 struct StatusView: View {
     @EnvironmentObject var settings: SettingsStore
@@ -9,6 +7,11 @@ struct StatusView: View {
     @State private var newPlatformName = ""
     @State private var newPlatformIcon = "questionmark"
     
+    // Simple device detection
+    private var isiPad: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad
+    }
+    
     var body: some View {
         NavigationView {
             ZStack {
@@ -16,7 +19,7 @@ struct StatusView: View {
                     .edgesIgnoringSafeArea(.all)
                 
                 ScrollView {
-                    VStack(spacing: 20) {
+                    VStack(spacing: isiPad ? 24 : 16) {
                         // Today's Summary
                         todaySummarySection
                         
@@ -25,28 +28,15 @@ struct StatusView: View {
                         
                         // Add Platform Button
                         if statusStore.platforms.count < 5 {
-                            Button(action: { showingPlatformSheet = true }) {
-                                HStack {
-                                    Image(systemName: "plus")
-                                    Text("Add Platform")
-                                }
-                                .foregroundColor(settings.currentTheme.accentColor)
-                                .padding()
-                                .frame(maxWidth: .infinity)
-                                .background(settings.currentTheme.backgroundColor.opacity(0.2))
-                                .cornerRadius(10)
-                            }
-                            .padding(.horizontal)
+                            addPlatformButton
                         }
                     }
-                    .padding(.vertical)
+                    .padding(.vertical, isiPad ? 24 : 16)
                 }
                 .navigationTitle("Social Status")
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        Button(action: {
-                            // Refresh action if needed
-                        }) {
+                        Button(action: {}) {
                             Image(systemName: "arrow.clockwise")
                                 .foregroundColor(settings.currentTheme.accentColor)
                         }
@@ -57,19 +47,25 @@ struct StatusView: View {
                 }
             }
         }
+        .navigationViewStyle(.stack)
     }
     
     private var todaySummarySection: some View {
         let todayMetrics = statusStore.getTodayMetrics()
         
-        return VStack(spacing: 16) {
+        return VStack(spacing: isiPad ? 20 : 16) {
             Text("Today's Activity")
-                .font(.title2.bold())
+                .font(isiPad ? .title2 : .headline)
+                .bold()
                 .foregroundColor(settings.currentTheme.textColor)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal)
+                .padding(.horizontal, isiPad ? 24 : 16)
             
-            HStack(spacing: 16) {
+            // Use LazyVGrid for both devices with different column counts
+            let columns = [GridItem](repeating: .init(.flexible(), spacing: isiPad ? 20 : 12),
+                                count: isiPad ? 4 : 2)
+            
+            LazyVGrid(columns: columns, spacing: isiPad ? 20 : 12) {
                 StatusMetricCard(
                     title: "Posts",
                     value: todayMetrics.posts.values.reduce(0, +),
@@ -83,10 +79,7 @@ struct StatusView: View {
                     icon: "text.bubble",
                     color: .green
                 )
-            }
-            .padding(.horizontal)
-            
-            HStack(spacing: 16) {
+                
                 StatusMetricCard(
                     title: "Minutes",
                     value: todayMetrics.minutes.values.reduce(0, +),
@@ -101,27 +94,60 @@ struct StatusView: View {
                     color: .purple
                 )
             }
-            .padding(.horizontal)
+            .padding(.horizontal, isiPad ? 24 : 16)
         }
     }
     
     private var platformMetricsSection: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: isiPad ? 20 : 16) {
             Text("Platform Breakdown")
-                .font(.title2.bold())
+                .font(isiPad ? .title2 : .headline)
+                .bold()
                 .foregroundColor(settings.currentTheme.textColor)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal)
+                .padding(.horizontal, isiPad ? 24 : 16)
             
-            ForEach(statusStore.platforms) { platform in
-                PlatformCard(platform: platform, statusStore: statusStore)
-                    .padding(.horizontal)
+            // Simple conditional layout
+            if isiPad {
+                // iPad layout - 2 columns
+                let columns = [GridItem](repeating: .init(.flexible(), spacing: 20), count: 2)
+                
+                LazyVGrid(columns: columns, spacing: 20) {
+                    ForEach(statusStore.platforms) { platform in
+                        PlatformCard(platform: platform, statusStore: statusStore, isiPad: true)
+                    }
+                }
+                .padding(.horizontal, 24)
+            } else {
+                // iPhone layout - single column
+                VStack(spacing: 12) {
+                    ForEach(statusStore.platforms) { platform in
+                        PlatformCard(platform: platform, statusStore: statusStore, isiPad: false)
+                    }
+                }
+                .padding(.horizontal, 16)
             }
         }
     }
     
+    private var addPlatformButton: some View {
+        Button(action: { showingPlatformSheet = true }) {
+            HStack {
+                Image(systemName: "plus")
+                Text("Add Platform")
+            }
+            .foregroundColor(settings.currentTheme.accentColor)
+            .padding()
+            .frame(maxWidth: isiPad ? 400 : .infinity)
+            .background(settings.currentTheme.backgroundColor.opacity(0.2))
+            .cornerRadius(10)
+        }
+        .padding(.horizontal, isiPad ? 24 : 16)
+    }
+    
     private var addPlatformSheet: some View {
         NavigationView {
+            // Keep your existing sheet content
             Form {
                 Section(header: Text("Platform Details").foregroundColor(settings.currentTheme.accentColor)) {
                     TextField("Platform Name", text: $newPlatformName)
@@ -164,55 +190,53 @@ struct PlatformCard: View {
     @EnvironmentObject var settings: SettingsStore
     let platform: Platform
     @ObservedObject var statusStore: StatusStore
+    let isiPad: Bool
     
     var body: some View {
         let todayMetrics = statusStore.getTodayMetrics()
         
-        return VStack(spacing: 12) {
+        return VStack(spacing: isiPad ? 16 : 12) {
             HStack {
                 Image(systemName: platform.icon)
-                    .font(.title)
+                    .font(isiPad ? .title : .headline)
                     .foregroundColor(settings.currentTheme.accentColor)
                 
                 Text(platform.name)
-                    .font(.headline)
+                    .font(isiPad ? .headline : .subheadline)
                     .foregroundColor(settings.currentTheme.textColor)
                 
                 Spacer()
             }
             
-            HStack(spacing: 16) {
+            HStack(spacing: isiPad ? 20 : 12) {
                 StatusMetricPill(
                     value: "\(todayMetrics.count(for: .post, platformId: platform.id))",
                     label: "Posts",
                     color: .blue,
-                    action: {
-                        statusStore.incrementMetric(for: platform.id, metric: .post)
-                    }
+                    action: { statusStore.incrementMetric(for: platform.id, metric: .post) },
+                    isiPad: isiPad
                 )
                 
                 StatusMetricPill(
                     value: "\(todayMetrics.count(for: .comment, platformId: platform.id))",
                     label: "Comments",
                     color: .green,
-                    action: {
-                        statusStore.incrementMetric(for: platform.id, metric: .comment)
-                    }
+                    action: { statusStore.incrementMetric(for: platform.id, metric: .comment) },
+                    isiPad: isiPad
                 )
                 
                 StatusMetricPill(
                     value: "\(todayMetrics.count(for: .minute, platformId: platform.id))",
                     label: "Minutes",
                     color: .orange,
-                    action: {
-                        statusStore.incrementMetric(for: platform.id, metric: .minute)
-                    }
+                    action: { statusStore.incrementMetric(for: platform.id, metric: .minute) },
+                    isiPad: isiPad
                 )
             }
         }
-        .padding()
+        .padding(isiPad ? 16 : 12)
         .background(settings.currentTheme.backgroundColor.opacity(0.2))
-        .cornerRadius(10)
+        .cornerRadius(12)
     }
 }
 
@@ -252,19 +276,20 @@ struct StatusMetricPill: View {
     let label: String
     let color: Color
     let action: () -> Void
+    let isiPad: Bool
     
     var body: some View {
         Button(action: action) {
             VStack(spacing: 4) {
                 Text(value)
-                    .font(.subheadline.bold())
+                    .font(isiPad ? .subheadline.bold() : .caption.bold())
                     .foregroundColor(settings.currentTheme.textColor)
                 Text(label)
-                    .font(.caption2)
+                    .font(isiPad ? .caption : .caption2)
                     .foregroundColor(settings.currentTheme.textColor.opacity(0.7))
             }
-            .padding(8)
-            .frame(minWidth: 60)
+            .padding(isiPad ? 12 : 8)
+            .frame(minWidth: isiPad ? 80 : 60)
             .background(color.opacity(0.2))
             .cornerRadius(20)
         }

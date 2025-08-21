@@ -1,22 +1,35 @@
-import SwiftUI
 import Foundation
 
-class ExpenseStore: ObservableObject {
-    @Published var expenses: [Expense] = [] {
+@MainActor
+final class ExpenseStore: ObservableObject {
+    @Published private(set) var expenses: [Expense] = [] {
         didSet {
+            guard !isInitializing else { return }
             saveExpenses()
         }
     }
     
-    private var lastRecurringCheck: Date = Date.distantPast
-    private let maxExpenses = 10_000
+    // MARK: - State Management
+    private var isInitializing = false
+    private var isLoading = false
+    private var isSaving = false
+    private var lastRecurringCheck = Date.distantPast
     private let calendar = Calendar.current
+    private let maxExpenses = 10_000
     
+    // MARK: - Initialization
     init() {
+        isInitializing = true
         loadExpenses()
-        checkRecurringExpenses()
+        isInitializing = false
+        
+        // Schedule recurring check after slight delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            self?.checkRecurringExpenses()
+        }
     }
     
+    // MARK: - Public Methods
     func addExpense(_ expense: Expense) {
         guard expenses.count < maxExpenses else { return }
         expenses.append(expense)
@@ -28,14 +41,34 @@ class ExpenseStore: ObservableObject {
         }
     }
     
+    // MARK: - Data Access
+    var todayTotal: Double {
+        expensesForDate(Date()).reduce(0) { $0 + $1.amount }
+    }
+    
+    var weeklyTotal: Double {
+        let currentWeek = calendar.component(.weekOfYear, from: Date())
+        return expenses.filter {
+            calendar.component(.weekOfYear, from: $0.date) == currentWeek ||
+            ($0.isRecurring && $0.recurrence == .weekly)
+        }.reduce(0) { $0 + $1.amount }
+    }
+    
+    var monthlyTotal: Double {
+        let currentMonth = calendar.component(.month, from: Date())
+        return expenses.filter {
+            calendar.component(.month, from: $0.date) == currentMonth ||
+            ($0.isRecurring && $0.recurrence == .monthly)
+        }.reduce(0) { $0 + $1.amount }
+    }
+    
     func expensesForDate(_ date: Date) -> [Expense] {
         let startOfDay = calendar.startOfDay(for: date)
         
         return expenses.filter { expense in
             if expense.isRecurring, let recurrence = expense.recurrence {
                 switch recurrence {
-                case .daily:
-                    return true
+                case .daily: return true
                 case .weekly:
                     return calendar.component(.weekday, from: startOfDay) == calendar.component(.weekday, from: expense.date)
                 case .monthly:
@@ -51,26 +84,65 @@ class ExpenseStore: ObservableObject {
         }
     }
     
-    func todayTotal() -> Double {
-        expensesForDate(Date()).reduce(0) { $0 + $1.amount }
+    // MARK: - Persistence
+    private func saveExpenses() {
+        guard !isSaving else { return }
+        isSaving = true
+        
+        let expensesToSave = expenses
+        
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            do {
+                let encoded = try JSONEncoder().encode(expensesToSave)
+                
+                // Validate size before saving
+                if encoded.count > 100_000 {
+                    print("⚠️ Large expenses data: \(encoded.count) bytes")
+                }
+                
+                DispatchQueue.main.async {
+                    UserDefaults.standard.set(encoded, forKey: "expenses")
+                    self?.isSaving = false
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    print("🚨 Save error: \(error.localizedDescription)")
+                    self?.isSaving = false
+                }
+            }
+        }
     }
     
-    func weeklyTotal() -> Double {
-        let currentWeek = calendar.component(.weekOfYear, from: Date())
-        return expenses.filter {
-            calendar.component(.weekOfYear, from: $0.date) == currentWeek ||
-            ($0.isRecurring && $0.recurrence == .weekly)
-        }.reduce(0) { $0 + $1.amount }
+    private func loadExpenses() {
+        guard !isLoading else { return }
+        isLoading = true
+        
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            do {
+                if let data = UserDefaults.standard.data(forKey: "expenses") {
+                    let decoded = try JSONDecoder().decode([Expense].self, from: data)
+                    
+                    DispatchQueue.main.async {
+                        self?.expenses = decoded.filter { $0.amount >= 0 } // Basic validation
+                        self?.isLoading = false
+                        print("✅ Successfully loaded \(decoded.count) expenses")
+                    }
+                } else {
+                    DispatchQueue.main.async {
+                        self?.isLoading = false
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    print("🚨 Load error: \(error.localizedDescription)")
+                    self?.expenses = [] // Reset to empty array
+                    self?.isLoading = false
+                }
+            }
+        }
     }
     
-    func monthlyTotal() -> Double {
-        let currentMonth = calendar.component(.month, from: Date())
-        return expenses.filter {
-            calendar.component(.month, from: $0.date) == currentMonth ||
-            ($0.isRecurring && $0.recurrence == .monthly)
-        }.reduce(0) { $0 + $1.amount }
-    }
-    
+    // MARK: - Recurring Expenses
     private func checkRecurringExpenses() {
         let now = Date()
         guard now.timeIntervalSince(lastRecurringCheck) > 86400 else { return }
@@ -80,9 +152,14 @@ class ExpenseStore: ObservableObject {
         let todayExpenses = expenses.filter { calendar.isDate($0.date, inSameDayAs: today) }
         
         let recurringToAdd = expenses.filter { expense in
-            expense.isRecurring &&
-            !todayExpenses.contains(where: { $0.id == expense.id })
+            guard expense.isRecurring,
+                  !calendar.isDate(expense.date, inSameDayAs: today),
+                  !todayExpenses.contains(where: { $0.isDuplicate(of: expense) })
+            else { return false }
+            return true
         }
+        
+        guard !recurringToAdd.isEmpty else { return }
         
         let newExpenses = recurringToAdd.map { expense in
             Expense(
@@ -98,17 +175,14 @@ class ExpenseStore: ObservableObject {
         
         expenses.append(contentsOf: newExpenses)
     }
-    
-    private func saveExpenses() {
-        if let encoded = try? JSONEncoder().encode(expenses) {
-            UserDefaults.standard.set(encoded, forKey: "expenses")
-        }
-    }
-    
-    private func loadExpenses() {
-        if let data = UserDefaults.standard.data(forKey: "expenses"),
-           let decoded = try? JSONDecoder().decode([Expense].self, from: data) {
-            expenses = decoded
-        }
+}
+
+// Add to your Expense model:
+extension Expense {
+    func isDuplicate(of other: Expense) -> Bool {
+        return self.title == other.title &&
+               self.amount == other.amount &&
+               self.category == other.category &&
+               self.recurrence == other.recurrence
     }
 }

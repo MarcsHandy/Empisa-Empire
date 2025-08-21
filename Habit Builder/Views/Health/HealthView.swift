@@ -2,8 +2,7 @@ import SwiftUI
 import AVFoundation
 import Foundation
 
-struct HealthView: View {
-    @EnvironmentObject var settings: SettingsStore
+struct HealthView: View {    @EnvironmentObject var settings: SettingsStore
     @ObservedObject var healthStore: HealthStore
     @State private var showingAddHealth = false
     @State private var showingUnitSettings = false
@@ -224,6 +223,7 @@ struct HealthView: View {
                     WaterUnitSettingsView()
                 }
             }
+        .navigationViewStyle(.stack)
         }
     }
 
