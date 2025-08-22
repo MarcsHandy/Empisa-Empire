@@ -123,6 +123,7 @@ struct ContentView: View {
                 setupAppearance(theme: settingsStore.currentTheme)
             }
         }
+        .navigationViewStyle(.stack)
     }
 
     

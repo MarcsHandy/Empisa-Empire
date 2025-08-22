@@ -76,6 +76,7 @@ struct GoalsView: View {
                 )
             }
         }
+        .navigationViewStyle(.stack)
     }
 }
 

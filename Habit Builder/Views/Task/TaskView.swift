@@ -85,6 +85,7 @@ struct TaskView: View {
                     .environmentObject(settings)
             }
         }
+        .navigationViewStyle(.stack)
     }
     
     private var filteredTasks: [Task] {
@@ -514,7 +515,7 @@ struct EditTaskView: View {
     @State private var editedTitle: String
     @State private var editedNotes: String
     @State private var editedColor: Task.TaskColor
-    @State private var editedIsAllDay: Bool
+    @State private var editedIsAllDay: Bool = false // Default to false
     @State private var editedRecurrence: Task.Recurrence?
     @State private var editedRecurrenceDays: [Int]?
     
@@ -529,12 +530,12 @@ struct EditTaskView: View {
         _editedTitle = State(initialValue: task.title)
         _editedNotes = State(initialValue: task.notes)
         _editedColor = State(initialValue: task.color)
-        _editedIsAllDay = State(initialValue: Calendar.current.isDate(task.startDate, inSameDayAs: task.endDate))
+        _editedIsAllDay = State(initialValue: false) // Force default to false
         _editedRecurrence = State(initialValue: task.recurrence)
         _editedRecurrenceDays = State(initialValue: task.recurrenceDays)
         
         // Initialize date and time components
-        _ = Calendar.current
+        let calendar = Calendar.current
         _startDate = State(initialValue: task.startDate)
         _startTime = State(initialValue: task.startDate)
         _endTime = State(initialValue: task.endDate)

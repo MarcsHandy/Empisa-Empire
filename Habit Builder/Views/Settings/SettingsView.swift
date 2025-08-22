@@ -2,8 +2,7 @@ import SwiftUI
 import AVFoundation
 import Foundation
 
-struct SettingsView: View {
-    @EnvironmentObject var settings: SettingsStore
+struct SettingsView: View {    @EnvironmentObject var settings: SettingsStore
     @State private var showingThemeEditor = false
     @State private var showingNotificationSettings = false
     @State private var showingDataOptions = false
@@ -149,6 +148,7 @@ struct SettingsView: View {
                 Text("This cannot be undone. All your data will be permanently deleted.")
             }
         }
+        .navigationViewStyle(.stack)
     }
 }
 

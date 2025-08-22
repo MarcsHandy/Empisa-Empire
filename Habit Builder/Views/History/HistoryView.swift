@@ -2,8 +2,7 @@ import SwiftUI
 import AVFoundation
 import Foundation
 
-struct HistoryView: View {
-    @EnvironmentObject var settings: SettingsStore
+struct HistoryView: View {    @EnvironmentObject var settings: SettingsStore
     @StateObject private var historyStore = HistoryStore()
     @State private var selectedCourse: HistoryCourse? = nil
     
@@ -27,6 +26,7 @@ struct HistoryView: View {
                     .environmentObject(settings)
             }
         }
+        .navigationViewStyle(.stack)
     }
     
     private func currentCourseView(course: HistoryCourse) -> some View {
