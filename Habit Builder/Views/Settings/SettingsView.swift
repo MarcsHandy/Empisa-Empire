@@ -4,13 +4,44 @@ import Foundation
 
 struct SettingsView: View {
     @EnvironmentObject var settings: SettingsStore
+    @ObservedObject var authViewModel: AuthViewModel // Add this
     @State private var showingThemeEditor = false
     @State private var showingNotificationSettings = false
     @State private var showingDataOptions = false
+    @State private var showingLogoutConfirmation = false // Add this
     
     var body: some View {
         NavigationView {
             List {
+                // Account Section - Add this new section
+                if authViewModel.isAuthenticated {
+                    Section(header: Text("Account").foregroundColor(settings.currentTheme.textColor)) {
+                        HStack {
+                            Image(systemName: "person.circle")
+                                .foregroundColor(settings.currentTheme.accentColor)
+                            Text("Signed in as")
+                            Spacer()
+                            Text(authViewModel.user?.email ?? "User")
+                                .foregroundColor(settings.currentTheme.textColor.opacity(0.7))
+                                .font(.caption)
+                        }
+                        
+                        Button(role: .destructive) {
+                            showingLogoutConfirmation = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "rectangle.portrait.and.arrow.right")
+                                    .foregroundColor(.red)
+                                Text("Sign Out")
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                    }
+                    .listRowBackground(settings.currentTheme.backgroundColor.opacity(0.2))
+                }
+                
                 // Appearance Section
                 Section(header: Text("Appearance").foregroundColor(settings.currentTheme.textColor)) {
                     NavigationLink(destination: ThemeEditorView()) {
@@ -147,6 +178,14 @@ struct SettingsView: View {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("This cannot be undone. All your data will be permanently deleted.")
+            }
+            .confirmationDialog("Sign Out", isPresented: $showingLogoutConfirmation, titleVisibility: .visible) {
+                Button("Sign Out", role: .destructive) {
+                    authViewModel.signOut()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Are you sure you want to sign out?")
             }
         }
     }

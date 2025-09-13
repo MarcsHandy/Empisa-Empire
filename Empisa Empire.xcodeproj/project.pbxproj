@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		C96B38142E7458BE00554904 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = C96B38132E7458BE00554904 /* FirebaseAnalytics */; };
+		C96B38162E7458BE00554904 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = C96B38152E7458BE00554904 /* FirebaseAuth */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		3BE4E6C32DC15DD000232994 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -53,6 +58,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C96B38142E7458BE00554904 /* FirebaseAnalytics in Frameworks */,
+				C96B38162E7458BE00554904 /* FirebaseAuth in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -114,6 +121,8 @@
 			);
 			name = "Empisa Empire";
 			packageProductDependencies = (
+				C96B38132E7458BE00554904 /* FirebaseAnalytics */,
+				C96B38152E7458BE00554904 /* FirebaseAuth */,
 			);
 			productName = "Habit Builder";
 			productReference = 3BE4E6B52DC15DCA00232994 /* Empisa Empire.app */;
@@ -198,6 +207,7 @@
 			mainGroup = 3BE4E6AC2DC15DCA00232994;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				C96B38122E7458BE00554904 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 3BE4E6B62DC15DCA00232994 /* Products */;
@@ -560,6 +570,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		C96B38122E7458BE00554904 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.2.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		C96B38132E7458BE00554904 /* FirebaseAnalytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C96B38122E7458BE00554904 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalytics;
+		};
+		C96B38152E7458BE00554904 /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C96B38122E7458BE00554904 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 3BE4E6AD2DC15DCA00232994 /* Project object */;
 }

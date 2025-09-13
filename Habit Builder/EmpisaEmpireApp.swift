@@ -1,7 +1,19 @@
 import SwiftUI
+import FirebaseCore
+import Firebase
+
+class AppDelegate: NSObject, UIApplicationDelegate {
+  func application(_ application: UIApplication,
+                   didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
+    FirebaseApp.configure()
+
+    return true
+  }
+}
 
 @main
 struct EmpireApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @StateObject private var settingsStore = SettingsStore()
     @StateObject private var taskStore = TaskStore()
     @StateObject private var incomeStore = IncomeStore()

@@ -6,6 +6,7 @@ struct SideMenuView: View {
     @EnvironmentObject var settings: SettingsStore
     @Binding var selectedTab: ContentView.Tab
     @Binding var isMenuOpen: Bool
+    @ObservedObject var authViewModel: AuthViewModel // Add this
     
     var body: some View {
         ZStack {
@@ -23,6 +24,14 @@ struct SideMenuView: View {
                         Text("Track your progress")
                             .font(.subheadline)
                             .foregroundColor(settings.currentTheme.textColor.opacity(0.7))
+                        
+                        // Add user email display if authenticated
+                        if authViewModel.isAuthenticated, let email = authViewModel.user?.email {
+                            Text(email)
+                                .font(.caption)
+                                .foregroundColor(settings.currentTheme.textColor.opacity(0.6))
+                                .padding(.top, 4)
+                        }
                     }
                     .padding(.top, 50)
                     .padding(.bottom, 30)
@@ -69,7 +78,32 @@ struct SideMenuView: View {
                     
                     // Settings at the bottom
                     MenuItemButton(tab: .settings, selectedTab: $selectedTab, isMenuOpen: $isMenuOpen)
+                        .padding(.bottom, 20)
+                    
+                    // Sign Out Button - Add this at the very bottom
+                    if authViewModel.isAuthenticated {
+                        Button(action: {
+                            authViewModel.signOut()
+                            withAnimation {
+                                isMenuOpen = false
+                            }
+                        }) {
+                            HStack {
+                                Image(systemName: "rectangle.portrait.and.arrow.right")
+                                    .foregroundColor(.red)
+                                    .frame(width: 30)
+                                Text("Sign Out")
+                                    .foregroundColor(.red)
+                                Spacer()
+                            }
+                            .padding(.vertical, 12)
+                            .padding(.horizontal, 20)
+                            .background(Color.red.opacity(0.1))
+                            .cornerRadius(10)
+                        }
                         .padding(.bottom, 30)
+                        .padding(.horizontal, 20)
+                    }
                 }
                 .padding(.leading, 20)
                 .frame(width: UIScreen.main.bounds.width * 0.7)
